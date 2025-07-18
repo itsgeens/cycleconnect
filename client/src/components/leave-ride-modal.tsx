@@ -18,7 +18,7 @@ export default function LeaveRideModal({
 }: LeaveRideModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="modal-content z-[10001]">
         <DialogHeader>
           <DialogTitle>Leave Ride</DialogTitle>
           <DialogDescription>

@@ -63,6 +63,34 @@
   }
 }
 
+/* Modal z-index fix - ensure modals appear above everything */
+.modal-overlay {
+  z-index: 10000 !important;
+}
+
+.modal-content {
+  z-index: 10001 !important;
+}
+
+/* Radix Dialog z-index fixes */
+[data-radix-dialog-overlay] {
+  z-index: 10000 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 10001 !important;
+}
+
+/* Ensure all dialog components have high z-index */
+[data-radix-popper-content-wrapper] {
+  z-index: 10000 !important;
+}
+
+/* Leaflet maps have z-index 400 by default, so we need to be above that */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
 @layer utilities {
   .bg-cycling-blue {
     background-color: var(--cycling-blue);
