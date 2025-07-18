@@ -286,24 +286,7 @@ export default function LocationPicker({ onLocationSelect, selectedLocation }: L
           )}
         </div>
         
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">Popular Cycling Locations:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {POPULAR_LOCATIONS.map((location, index) => (
-              <Button
-                key={index}
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleLocationSelect(location)}
-                className="text-left justify-start p-2 h-auto"
-              >
-                <MapPin className="w-3 h-3 mr-2 flex-shrink-0" />
-                <span className="text-xs">{location.name}</span>
-              </Button>
-            ))}
-          </div>
-        </div>
+        
       </div>
     </div>
   );
