@@ -74,17 +74,17 @@ export default function RideCard({
         />
         
         {/* Tags overlaid on top left */}
-        <div className="absolute top-2 left-2 flex gap-1">
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+        <div className="absolute top-2 left-2 flex gap-1 z-10">
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs shadow-sm">
             {ride.rideType}
           </Badge>
-          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs shadow-sm">
             {ride.surfaceType}
           </Badge>
         </div>
 
         {/* Participant count overlaid on top right */}
-        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 flex items-center gap-1">
+        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 flex items-center gap-1 z-10 shadow-sm">
           <Users className="w-3 h-3 text-gray-600" />
           <span className="text-xs font-medium">{ride.participants?.length || 0}</span>
         </div>
