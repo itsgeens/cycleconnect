@@ -407,16 +407,40 @@ export class DatabaseStorage implements IStorage {
         previousStartDate = new Date(0);
     }
 
-    // Get current period stats (count all rides in the period, not just completed ones)
+    // Get current period stats (only count rides where user has uploaded GPX data)
     const currentStats = await db
       .select({
-        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} AND ${rideParticipants.userId} = ${userId} THEN ${rides.id} END)`,
-        ridesHosted: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} = ${userId} THEN ${rides.id} END)`,
-        totalDistance: sql<number>`0`, // Will be calculated with GPX data
-        totalElevation: sql<number>`0`, // Will be calculated with GPX data
+        ridesJoined: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${rides.organizerId} != ${userId} 
+          AND ${rideParticipants.userId} = ${userId} 
+          AND ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.gpxFilePath} IS NOT NULL 
+          THEN ${rides.id} 
+          END)`,
+        ridesHosted: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${rides.organizerId} = ${userId} 
+          AND ${rides.isCompleted} = true 
+          THEN ${rides.id} 
+          END)`,
+        totalDistance: sql<number>`SUM(CASE 
+          WHEN ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.distance} IS NOT NULL 
+          THEN CAST(${activityMatches.distance} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+        totalElevation: sql<number>`SUM(CASE 
+          WHEN ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.elevationGain} IS NOT NULL 
+          THEN CAST(${activityMatches.elevationGain} AS DECIMAL) 
+          ELSE 0 
+          END)`,
       })
       .from(rides)
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
+      .leftJoin(activityMatches, and(
+        eq(rides.id, activityMatches.rideId),
+        eq(activityMatches.userId, userId)
+      ))
       .where(
         and(
           sql`${rides.createdAt} >= ${startDate}`,
@@ -425,16 +449,40 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    // Get previous period stats for comparison
+    // Get previous period stats for comparison (only count rides where user has uploaded GPX data)
     const previousStats = await db
       .select({
-        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} AND ${rideParticipants.userId} = ${userId} THEN ${rides.id} END)`,
-        ridesHosted: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} = ${userId} THEN ${rides.id} END)`,
-        totalDistance: sql<number>`0`,
-        totalElevation: sql<number>`0`,
+        ridesJoined: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${rides.organizerId} != ${userId} 
+          AND ${rideParticipants.userId} = ${userId} 
+          AND ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.gpxFilePath} IS NOT NULL 
+          THEN ${rides.id} 
+          END)`,
+        ridesHosted: sql<number>`COUNT(DISTINCT CASE 
+          WHEN ${rides.organizerId} = ${userId} 
+          AND ${rides.isCompleted} = true 
+          THEN ${rides.id} 
+          END)`,
+        totalDistance: sql<number>`SUM(CASE 
+          WHEN ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.distance} IS NOT NULL 
+          THEN CAST(${activityMatches.distance} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+        totalElevation: sql<number>`SUM(CASE 
+          WHEN ${activityMatches.userId} = ${userId} 
+          AND ${activityMatches.elevationGain} IS NOT NULL 
+          THEN CAST(${activityMatches.elevationGain} AS DECIMAL) 
+          ELSE 0 
+          END)`,
       })
       .from(rides)
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
+      .leftJoin(activityMatches, and(
+        eq(rides.id, activityMatches.rideId),
+        eq(activityMatches.userId, userId)
+      ))
       .where(
         and(
           sql`${rides.createdAt} >= ${previousStartDate}`,
@@ -446,6 +494,61 @@ export class DatabaseStorage implements IStorage {
     const current = currentStats[0] || { ridesJoined: 0, ridesHosted: 0, totalDistance: 0, totalElevation: 0 };
     const previous = previousStats[0] || { ridesJoined: 0, ridesHosted: 0, totalDistance: 0, totalElevation: 0 };
 
+    // Get solo activities stats for current period
+    const currentSoloStats = await db
+      .select({
+        soloDistance: sql<number>`SUM(CASE 
+          WHEN ${soloActivities.distance} IS NOT NULL 
+          THEN CAST(${soloActivities.distance} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+        soloElevation: sql<number>`SUM(CASE 
+          WHEN ${soloActivities.elevationGain} IS NOT NULL 
+          THEN CAST(${soloActivities.elevationGain} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+      })
+      .from(soloActivities)
+      .where(
+        and(
+          eq(soloActivities.userId, userId),
+          sql`${soloActivities.completedAt} >= ${startDate}`,
+          sql`${soloActivities.completedAt} <= ${now}`
+        )
+      );
+
+    // Get solo activities stats for previous period
+    const previousSoloStats = await db
+      .select({
+        soloDistance: sql<number>`SUM(CASE 
+          WHEN ${soloActivities.distance} IS NOT NULL 
+          THEN CAST(${soloActivities.distance} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+        soloElevation: sql<number>`SUM(CASE 
+          WHEN ${soloActivities.elevationGain} IS NOT NULL 
+          THEN CAST(${soloActivities.elevationGain} AS DECIMAL) 
+          ELSE 0 
+          END)`,
+      })
+      .from(soloActivities)
+      .where(
+        and(
+          eq(soloActivities.userId, userId),
+          sql`${soloActivities.completedAt} >= ${previousStartDate}`,
+          sql`${soloActivities.completedAt} < ${startDate}`
+        )
+      );
+
+    const currentSolo = currentSoloStats[0] || { soloDistance: 0, soloElevation: 0 };
+    const previousSolo = previousSoloStats[0] || { soloDistance: 0, soloElevation: 0 };
+
+    // Calculate totals including solo activities
+    const totalCurrentDistance = Number(current.totalDistance) + Number(currentSolo.soloDistance);
+    const totalCurrentElevation = Number(current.totalElevation) + Number(currentSolo.soloElevation);
+    const totalPreviousDistance = Number(previous.totalDistance) + Number(previousSolo.soloDistance);
+    const totalPreviousElevation = Number(previous.totalElevation) + Number(previousSolo.soloElevation);
+
     // Get follower/following counts
     const followersCount = await this.getFollowerCount(userId);
     const followingCount = await this.getFollowingCount(userId);
@@ -453,12 +556,12 @@ export class DatabaseStorage implements IStorage {
     return {
       ridesJoined: Number(current.ridesJoined),
       ridesHosted: Number(current.ridesHosted),
-      totalDistance: Number(current.totalDistance),
-      totalElevation: Number(current.totalElevation),
+      totalDistance: totalCurrentDistance,
+      totalElevation: totalCurrentElevation,
       ridesJoinedChange: Number(current.ridesJoined) - Number(previous.ridesJoined),
       ridesHostedChange: Number(current.ridesHosted) - Number(previous.ridesHosted),
-      totalDistanceChange: Number(current.totalDistance) - Number(previous.totalDistance),
-      totalElevationChange: Number(current.totalElevation) - Number(previous.totalElevation),
+      totalDistanceChange: totalCurrentDistance - totalPreviousDistance,
+      totalElevationChange: totalCurrentElevation - totalPreviousElevation,
       followersCount,
       followingCount,
     };

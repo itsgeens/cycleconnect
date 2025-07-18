@@ -161,6 +161,9 @@ The application follows a traditional full-stack architecture with clear separat
 - **Backend API Integration**: Complete-with-data endpoint processes GPX files and creates activity match records
 - **Data Source Fix**: Fixed activities page to use correct endpoint (completed-activities) that includes userActivityData instead of my-rides
 - **Verified End-to-End**: Fully tested GPX upload workflow with multiple participants showing personal performance data correctly
+- **Activity Filtering System**: Added toggle button to show/hide group rides where user hasn't uploaded GPX data
+- **Statistics Exclusion**: Updated My Stats calculations to only count activities where user has uploaded GPX data, excluding unverified rides
+- **Smart Activity Display**: Activities page now differentiates between verified rides (with user data) and unverified rides (without user data)
 
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation

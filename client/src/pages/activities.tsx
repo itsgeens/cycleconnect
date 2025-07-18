@@ -7,10 +7,11 @@ import ActivityCard from "@/components/activity-card";
 import LeaveRideModal from "@/components/leave-ride-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Trophy, Clock, MapPin, Users } from "lucide-react";
+import { Calendar, Trophy, Clock, MapPin, Users, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function Activities() {
@@ -20,6 +21,7 @@ export default function Activities() {
   const queryClient = useQueryClient();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [selectedRide, setSelectedRide] = useState<any>(null);
+  const [showRidesWithoutData, setShowRidesWithoutData] = useState(false);
 
   const { data: myRides, isLoading } = useQuery({
     queryKey: ["/api/my-rides"],
@@ -117,6 +119,36 @@ export default function Activities() {
     ...(completedActivities?.soloActivities || [])
   ].sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
 
+  // Filter completed activities based on user data availability
+  const filteredCompletedActivities = showRidesWithoutData 
+    ? allCompletedActivities 
+    : allCompletedActivities.filter(activity => {
+        // Include solo activities (they always have user data)
+        if (activity.gpxFilePath && !activity.organizerId) {
+          return true;
+        }
+        // Include group rides only if user has uploaded GPX data
+        return activity.userActivityData && activity.userActivityData.gpxFilePath;
+      });
+
+  const activitiesWithUserData = allCompletedActivities.filter(activity => {
+    // Solo activities always have user data
+    if (activity.gpxFilePath && !activity.organizerId) {
+      return true;
+    }
+    // Group rides only if user has uploaded GPX data
+    return activity.userActivityData && activity.userActivityData.gpxFilePath;
+  });
+
+  const activitiesWithoutUserData = allCompletedActivities.filter(activity => {
+    // Skip solo activities
+    if (activity.gpxFilePath && !activity.organizerId) {
+      return false;
+    }
+    // Include group rides only if user has NOT uploaded GPX data
+    return !activity.userActivityData || !activity.userActivityData.gpxFilePath;
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -141,7 +173,7 @@ export default function Activities() {
               <Trophy className="w-4 h-4" />
               Completed Activities
               <Badge variant="secondary" className="ml-2">
-                {allCompletedActivities.length}
+                {filteredCompletedActivities.length}
               </Badge>
             </TabsTrigger>
           </TabsList>
@@ -202,13 +234,56 @@ export default function Activities() {
               </div>
             ) : (
               <div className="space-y-4">
-                {allCompletedActivities.map((activity: any) => (
-                  <ActivityCard
-                    key={activity.id}
-                    activity={activity}
-                    type={activity.gpxFilePath && !activity.organizerId ? 'solo' : 'group'}
-                  />
-                ))}
+                {/* Filter Controls */}
+                <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                      Showing {filteredCompletedActivities.length} of {allCompletedActivities.length} completed activities
+                    </div>
+                    {activitiesWithoutUserData.length > 0 && (
+                      <div className="text-sm text-gray-500">
+                        ({activitiesWithoutUserData.length} rides without your data)
+                      </div>
+                    )}
+                  </div>
+                  
+                  {activitiesWithoutUserData.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRidesWithoutData(!showRidesWithoutData)}
+                      className="flex items-center gap-2"
+                    >
+                      {showRidesWithoutData ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showRidesWithoutData ? 'Hide' : 'Show'} joined rides with no user data uploaded
+                    </Button>
+                  )}
+                </div>
+
+                {/* Activities List */}
+                <div className="space-y-4">
+                  {filteredCompletedActivities.map((activity: any) => (
+                    <ActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      type={activity.gpxFilePath && !activity.organizerId ? 'solo' : 'group'}
+                    />
+                  ))}
+                </div>
+
+                {/* No activities message after filtering */}
+                {filteredCompletedActivities.length === 0 && !showRidesWithoutData && (
+                  <div className="text-center py-12">
+                    <Trophy className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No activities with your data</h3>
+                    <p className="text-gray-600 mb-4">
+                      Upload your GPX files to completed rides to see them here
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      You can use the toggle above to show rides where you haven't uploaded data yet
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
