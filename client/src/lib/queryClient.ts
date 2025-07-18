@@ -9,9 +9,11 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | undefined,
+  options: {
+    method: string;
+    data?: unknown | undefined;
+  }
 ): Promise<Response> {
   const authHeaders = authManager.getAuthHeaders();
   const headers: Record<string, string> = {};
@@ -22,14 +24,14 @@ export async function apiRequest(
   }
   
   // Add Content-Type header if we have data
-  if (data) {
+  if (options.data) {
     headers["Content-Type"] = "application/json";
   }
 
   const res = await fetch(url, {
-    method,
+    method: options.method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body: options.data ? JSON.stringify(options.data) : undefined,
     credentials: "include",
   });
 
