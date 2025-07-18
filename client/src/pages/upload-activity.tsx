@@ -54,7 +54,7 @@ export default function UploadActivityPage() {
       const response = await fetch("/api/upload-activity", {
         method: "POST",
         headers: {
-          "X-Session-ID": localStorage.getItem("sessionId") || "",
+          "Authorization": `Bearer ${localStorage.getItem("sessionId") || ""}`,
         },
         body: formData,
       });
