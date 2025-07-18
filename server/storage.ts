@@ -73,6 +73,8 @@ export interface IStorage {
 
   // Solo activities operations
   createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity>;
+  getSoloActivity(id: number): Promise<SoloActivity | undefined>;
+  deleteSoloActivity(id: number): Promise<void>;
   getUserSoloActivities(userId: number): Promise<SoloActivity[]>;
   getUserCompletedActivities(userId: number): Promise<{
     completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
@@ -734,6 +736,18 @@ export class DatabaseStorage implements IStorage {
       .from(soloActivities)
       .where(eq(soloActivities.userId, userId))
       .orderBy(desc(soloActivities.completedAt));
+  }
+
+  async getSoloActivity(id: number): Promise<SoloActivity | undefined> {
+    const [activity] = await db
+      .select()
+      .from(soloActivities)
+      .where(eq(soloActivities.id, id));
+    return activity || undefined;
+  }
+
+  async deleteSoloActivity(id: number): Promise<void> {
+    await db.delete(soloActivities).where(eq(soloActivities.id, id));
   }
 
   async getUserCompletedActivities(userId: number): Promise<{

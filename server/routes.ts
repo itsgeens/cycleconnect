@@ -7,6 +7,7 @@ import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
+import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { parseGPXFile, calculateRouteMatch } from "./gpx-parser";
 
@@ -553,18 +554,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/gpx/:filename', (req, res) => {
     try {
       const filename = req.params.filename;
-      const filePath = path.join(process.cwd(), 'uploads', filename);
+      const filePath = path.resolve(process.cwd(), 'uploads', filename);
+      
+      console.log('Serving GPX file:', filename, 'from path:', filePath);
       
       // Check if file exists
       if (!fs.existsSync(filePath)) {
+        console.error('GPX file not found:', filePath);
         return res.status(404).json({ message: 'GPX file not found' });
       }
       
       res.setHeader('Content-Type', 'application/gpx+xml');
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       res.sendFile(filePath);
     } catch (error) {
       console.error('GPX file serving error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Delete solo activity
+  app.delete('/api/activities/:id', requireAuth, async (req, res) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      const userId = req.userId;
+
+      // Get the activity to check ownership and get file path
+      const activity = await storage.getSoloActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: 'Activity not found' });
+      }
+
+      if (activity.userId !== userId) {
+        return res.status(403).json({ message: 'Not authorized to delete this activity' });
+      }
+
+      // Delete the GPX file if it exists
+      if (activity.gpxFilePath) {
+        try {
+          const filePath = path.resolve(process.cwd(), activity.gpxFilePath);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (fileError) {
+          console.warn('Could not delete GPX file:', fileError);
+        }
+      }
+
+      // Delete the activity from database
+      await storage.deleteSoloActivity(activityId);
+
+      res.json({ message: 'Activity deleted successfully' });
+    } catch (error) {
+      console.error('Delete activity error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

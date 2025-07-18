@@ -1,6 +1,17 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
 import { useLocation } from "wouter";
 import GPXMapPreview from "@/components/gpx-map-preview";
 import { 
@@ -13,9 +24,14 @@ import {
   Trophy,
   Calendar,
   Target,
-  Activity
+  Activity,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface ActivityCardProps {
   activity: any;
@@ -24,6 +40,9 @@ interface ActivityCardProps {
 
 export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const [, navigate] = useLocation();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -63,6 +82,31 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
     if (type === 'group') {
       navigate(`/ride/${activity.id}`);
     }
+  };
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: (activityId: number) => apiRequest(`/api/activities/${activityId}`, {
+      method: 'DELETE',
+    }),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Activity deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete activity",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteActivity = () => {
+    deleteActivityMutation.mutate(activity.id);
+    setShowDeleteDialog(false);
   };
 
   const completedDate = activity.completedAt || activity.createdAt;
@@ -235,18 +279,56 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             )}
           </div>
 
-          {isGroup && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/ride/${activity.id}`);
-              }}
-            >
-              View Ride Details
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isGroup && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/ride/${activity.id}`);
+                }}
+              >
+                View Ride Details
+              </Button>
+            )}
+            {!isGroup && (
+              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteDialog(true);
+                    }}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{activity.name}"? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteActivity}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={deleteActivityMutation.isPending}
+                    >
+                      {deleteActivityMutation.isPending ? 'Deleting...' : 'Delete'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
