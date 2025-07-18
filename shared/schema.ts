@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, real, jsonb, varchar, decimal, json, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -120,6 +120,50 @@ export const rideFiltersSchema = z.object({
   userLng: z.number().optional(),
 });
 
+// Device connections table
+export const deviceConnections = pgTable("device_connections", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceId: varchar("device_id", { length: 255 }).notNull(),
+  deviceName: varchar("device_name", { length: 255 }).notNull(),
+  deviceType: varchar("device_type", { length: 50 }).notNull(), // cycling_computer, smartwatch, phone
+  protocol: varchar("protocol", { length: 20 }).notNull(), // ble, ant_plus
+  manufacturer: varchar("manufacturer", { length: 100 }),
+  model: varchar("model", { length: 100 }),
+  batteryLevel: integer("battery_level"),
+  lastSeen: timestamp("last_seen"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserDevice: unique().on(table.userId, table.deviceId),
+}));
+
+// Activity matches table for automatic ride completion
+export const activityMatches = pgTable("activity_matches", {
+  id: serial("id").primaryKey(),
+  rideId: integer("ride_id").notNull().references(() => rides.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceId: varchar("device_id", { length: 255 }).notNull(),
+  routeMatchPercentage: decimal("route_match_percentage", { precision: 5, scale: 2 }).notNull(),
+  timeWindowMatch: boolean("time_window_match").notNull(),
+  isAutoCompleted: boolean("is_auto_completed").default(false),
+  gpxData: json("gpx_data"), // Store the uploaded GPX track data
+  matchingDetails: json("matching_details"), // Store detailed matching results
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+});
+
+// Zod schemas for device connections
+export const insertDeviceConnectionSchema = createInsertSchema(deviceConnections).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertActivityMatchSchema = createInsertSchema(activityMatches).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type InsertRide = z.infer<typeof insertRideSchema>;
@@ -128,3 +172,7 @@ export type User = typeof users.$inferSelect;
 export type Ride = typeof rides.$inferSelect;
 export type RideParticipant = typeof rideParticipants.$inferSelect;
 export type Follow = typeof follows.$inferSelect;
+export type DeviceConnection = typeof deviceConnections.$inferSelect;
+export type InsertDeviceConnection = z.infer<typeof insertDeviceConnectionSchema>;
+export type ActivityMatch = typeof activityMatches.$inferSelect;
+export type InsertActivityMatch = z.infer<typeof insertActivityMatchSchema>;

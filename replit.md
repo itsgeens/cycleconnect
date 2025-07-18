@@ -116,3 +116,21 @@ Preferred communication style: Simple, everyday language.
 - MIME type validation and size limits
 
 The application follows a traditional full-stack architecture with clear separation between client and server concerns, unified by shared TypeScript types and schemas. The choice of modern tools like Vite, Drizzle, and TanStack Query provides excellent developer experience while maintaining production performance.
+
+## Recent Changes
+
+### Smart Device Integration (July 18, 2025)
+- **Automatic Ride Completion System**: Complete infrastructure for connecting cycling computers and smartwatches
+- **Web Bluetooth API Integration**: Direct browser connection to BLE-enabled devices (Garmin, Wahoo, etc.)
+- **GPX Route Matching Engine**: Sophisticated algorithm using Needleman-Wunsch and Hausdorff distance for 85% route similarity detection
+- **Device Management System**: Save and manage connected devices with battery monitoring and protocol detection
+- **Database Schema Updates**: Added device_connections and activity_matches tables for device tracking and automated completion
+- **API Endpoints**: Complete set of endpoints for device management, activity matching, and automatic ride completion
+- **Frontend Components**: DeviceConnectionPanel with real-time connection status and device management
+
+### Technical Implementation Details
+- **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
+- **Time Window Validation**: Automatic completion only if activity starts within 1 hour of planned ride time
+- **Multi-Protocol Support**: Both Bluetooth Low Energy and ANT+ bridge compatibility
+- **Real-time Monitoring**: Live data streaming from connected devices during rides
+- **Automatic Validation**: 85% route similarity threshold with configurable parameters
