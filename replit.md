@@ -152,6 +152,14 @@ The application follows a traditional full-stack architecture with clear separat
 - **Timezone Conversion Fixes**: Fixed Singapore/Philippines timezone detection and display using native Intl.DateTimeFormat API
 - **Improved Coordinate Tolerance**: Enhanced distance calculations for start/end point matching with 10km tolerance instead of 5km
 
+### Participant GPX Upload System (July 18, 2025)
+- **Manual GPX Upload Interface**: Added upload button and dialog for participants to submit their activity data after completing group rides
+- **Personal Activity Data Storage**: Integrated with activityMatches table to store participant's individual performance metrics
+- **Data Precedence Logic**: Activity cards now display participant's personal data when available, falling back to planned route data
+- **Complete Activity Pipeline**: Full end-to-end workflow from GPX upload to data extraction, storage, and display
+- **Performance Metrics Display**: Shows participant's actual distance, time, elevation, and speed instead of generic "N/A" values
+- **Backend API Integration**: Complete-with-data endpoint processes GPX files and creates activity match records
+
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
 - **Time Window Validation**: Automatic completion only if activity starts within 1 hour of planned ride time
