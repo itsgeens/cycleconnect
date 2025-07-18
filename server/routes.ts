@@ -10,6 +10,7 @@ import path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { parseGPXFile, calculateRouteMatch } from "./gpx-parser";
+import { WeatherService } from "./weather";
 
 // Extend Request type to include userId
 declare global {
@@ -181,6 +182,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Weather routes
+  app.get("/api/weather/current", async (req, res) => {
+    try {
+      const { lat, lon } = req.query;
+      
+      if (!lat || !lon) {
+        return res.status(400).json({ message: "Latitude and longitude are required" });
+      }
+
+      const weather = await WeatherService.getCurrentWeather(
+        parseFloat(lat as string),
+        parseFloat(lon as string)
+      );
+
+      const cyclingAssessment = WeatherService.isGoodCyclingWeather(weather);
+
+      res.json({
+        weather,
+        cyclingAssessment,
+      });
+    } catch (error) {
+      console.error("Get current weather error:", error);
+      res.status(500).json({ message: "Failed to fetch weather data" });
+    }
+  });
+
+  app.get("/api/weather/forecast", async (req, res) => {
+    try {
+      const { lat, lon } = req.query;
+      
+      if (!lat || !lon) {
+        return res.status(400).json({ message: "Latitude and longitude are required" });
+      }
+
+      const forecast = await WeatherService.getWeatherForecast(
+        parseFloat(lat as string),
+        parseFloat(lon as string)
+      );
+
+      // Add cycling assessment for each forecast period
+      const forecastWithAssessment = {
+        current: {
+          ...forecast.current,
+          cyclingAssessment: WeatherService.isGoodCyclingWeather(forecast.current),
+        },
+        hourly: forecast.hourly.map(hour => ({
+          ...hour,
+          cyclingAssessment: WeatherService.isGoodCyclingWeather(hour),
+        })),
+        daily: forecast.daily.map(day => ({
+          ...day,
+          cyclingAssessment: WeatherService.isGoodCyclingWeather(day),
+        })),
+      };
+
+      res.json(forecastWithAssessment);
+    } catch (error) {
+      console.error("Get weather forecast error:", error);
+      res.status(500).json({ message: "Failed to fetch weather forecast" });
+    }
+  });
+
   // Ride routes
   app.post("/api/rides", requireAuth, upload.single("gpxFile"), async (req, res) => {
     try {
@@ -194,10 +257,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         meetupCoords: JSON.parse(req.body.meetupCoords),
       });
 
+      // Fetch weather forecast for the ride
+      let weatherData = null;
+      try {
+        const coords = JSON.parse(req.body.meetupCoords);
+        const forecast = await WeatherService.getWeatherForecast(coords.lat, coords.lng);
+        
+        // Find the closest weather forecast to the ride time
+        const rideTime = new Date(req.body.dateTime);
+        const closestForecast = forecast.hourly.find(hour => {
+          const forecastTime = new Date(hour.timestamp);
+          return Math.abs(forecastTime.getTime() - rideTime.getTime()) < 3 * 60 * 60 * 1000; // Within 3 hours
+        }) || forecast.current;
+
+        weatherData = {
+          ...closestForecast,
+          cyclingAssessment: WeatherService.isGoodCyclingWeather(closestForecast),
+        };
+      } catch (weatherError) {
+        console.warn("Failed to fetch weather data for ride:", weatherError);
+      }
+
       const ride = await storage.createRide({
         ...rideData,
         organizerId: req.userId!,
         gpxFilePath: `/uploads/${req.file.filename}`,
+        weatherData,
       });
 
       res.json(ride);

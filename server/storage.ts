@@ -106,7 +106,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createRide(rideData: InsertRide & { organizerId: number, gpxFilePath: string }): Promise<Ride> {
+  async createRide(rideData: InsertRide & { organizerId: number, gpxFilePath: string, weatherData?: any }): Promise<Ride> {
     const [ride] = await db
       .insert(rides)
       .values(rideData)

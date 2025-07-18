@@ -8,8 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authManager } from "../lib/auth";
-import { Upload } from "lucide-react";
+import { Upload, CloudSun } from "lucide-react";
 import LocationPicker from "./location-picker";
+import WeatherWidget from "./weather-widget";
 
 interface RideFormProps {
   onSuccess?: () => void;
@@ -230,6 +231,22 @@ export default function RideForm({ onSuccess }: RideFormProps) {
               rows={4}
             />
           </div>
+
+          {/* Weather Widget */}
+          {formData.meetupCoords.lat !== 0 && formData.meetupCoords.lng !== 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CloudSun className="w-4 h-4" />
+                Weather Forecast
+              </Label>
+              <WeatherWidget
+                lat={formData.meetupCoords.lat}
+                lon={formData.meetupCoords.lng}
+                showForecast={true}
+                compact={false}
+              />
+            </div>
+          )}
 
           <Button 
             type="submit" 

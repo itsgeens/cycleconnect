@@ -26,6 +26,7 @@ export const rides = pgTable("rides", {
   isCompleted: boolean("is_completed").default(false).notNull(),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  weatherData: jsonb("weather_data"), // Weather forecast data for the ride
 });
 
 export const rideParticipants = pgTable("ride_participants", {
