@@ -487,29 +487,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRiders(currentUserId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number; isFollowing: boolean }>> {
-    const ridersQuery = db
-      .select({
-        id: users.id,
-        username: users.username,
-        email: users.email,
-        password: users.password,
-        name: users.name,
-        createdAt: users.createdAt,
-        followersCount: sql<number>`count(distinct f1.${follows.followerId})`,
-        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
-        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`,
-        isFollowing: sql<boolean>`exists(select 1 from ${follows} f2 where f2.${follows.followerId} = ${currentUserId} and f2.${follows.followingId} = ${users.id})`
-      })
+    // Get all users except current user
+    const allUsers = await db
+      .select()
       .from(users)
-      .leftJoin(sql`${follows} as f1`, sql`f1.${follows.followingId} = ${users.id}`)
-      .leftJoin(rides, eq(rides.organizerId, users.id))
-      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
-      .where(sql`${users.id} != ${currentUserId}`)
-      .groupBy(users.id)
-      .orderBy(desc(sql`count(distinct f1.${follows.followerId})`));
+      .where(sql`${users.id} != ${currentUserId}`);
 
-    const riders = await ridersQuery;
-    return riders;
+    // Get stats for each user
+    const ridersWithStats = await Promise.all(
+      allUsers.map(async (user) => {
+        const followersCount = await this.getFollowerCount(user.id);
+        const followingCount = await this.getFollowingCount(user.id);
+        const isFollowing = await this.isFollowing(currentUserId, user.id);
+        
+        // Get completed rides count
+        const completedRides = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rideParticipants)
+          .leftJoin(rides, eq(rides.id, rideParticipants.rideId))
+          .where(
+            and(
+              eq(rideParticipants.userId, user.id),
+              eq(rides.isCompleted, true)
+            )
+          );
+        
+        // Get hosted rides count
+        const hostedRides = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rides)
+          .where(eq(rides.organizerId, user.id));
+        
+        return {
+          ...user,
+          followersCount,
+          completedRides: completedRides[0]?.count || 0,
+          hostedRides: hostedRides[0]?.count || 0,
+          isFollowing,
+        };
+      })
+    );
+
+    // Sort by followers count descending
+    return ridersWithStats.sort((a, b) => b.followersCount - a.followersCount);
   }
 
   async followUser(followerId: number, followingId: number): Promise<void> {
