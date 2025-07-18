@@ -164,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/me", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.userId);
+      const user = await storage.getUser(req.userId!);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -190,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ride = await storage.createRide({
         ...rideData,
-        organizerId: req.userId,
+        organizerId: req.userId!,
         gpxFilePath: req.file.path,
       });
 
@@ -234,12 +234,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rideId = parseInt(req.params.id);
       
       // Check if user is already joined
-      const isJoined = await storage.isUserJoined(rideId, req.userId);
+      const isJoined = await storage.isUserJoined(rideId, req.userId!);
       if (isJoined) {
         return res.status(400).json({ message: "Already joined this ride" });
       }
 
-      await storage.joinRide(rideId, req.userId);
+      await storage.joinRide(rideId, req.userId!);
       res.json({ message: "Successfully joined the ride" });
     } catch (error) {
       console.error("Join ride error:", error);
@@ -250,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/rides/:id/leave", requireAuth, async (req, res) => {
     try {
       const rideId = parseInt(req.params.id);
-      await storage.leaveRide(rideId, req.userId);
+      await storage.leaveRide(rideId, req.userId!);
       res.json({ message: "Successfully left the ride" });
     } catch (error) {
       console.error("Leave ride error:", error);

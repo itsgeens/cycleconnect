@@ -8,20 +8,20 @@ interface RideFiltersProps {
 
 export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
   const [filters, setFilters] = useState({
-    distance: "",
-    date: "",
-    time: "",
-    rideType: "",
-    surfaceType: "",
+    distance: "any",
+    date: "any",
+    time: "any",
+    rideType: "any",
+    surfaceType: "any",
   });
 
   const handleFilterChange = (key: string, value: string) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     
-    // Remove empty filters
+    // Remove empty filters and "any" values
     const cleanFilters = Object.fromEntries(
-      Object.entries(newFilters).filter(([_, v]) => v !== "")
+      Object.entries(newFilters).filter(([_, v]) => v !== "" && v !== "any")
     );
     
     onFiltersChange(cleanFilters);
@@ -37,7 +37,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
               <SelectValue placeholder="Any distance" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Any distance</SelectItem>
+              <SelectItem value="any">Any distance</SelectItem>
               <SelectItem value="0-5">Within 5 km</SelectItem>
               <SelectItem value="0-10">Within 10 km</SelectItem>
               <SelectItem value="0-20">Within 20 km</SelectItem>
@@ -52,7 +52,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
               <SelectValue placeholder="Any date" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Any date</SelectItem>
+              <SelectItem value="any">Any date</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="tomorrow">Tomorrow</SelectItem>
               <SelectItem value="this-week">This week</SelectItem>
@@ -68,7 +68,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
               <SelectValue placeholder="Any time" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Any time</SelectItem>
+              <SelectItem value="any">Any time</SelectItem>
               <SelectItem value="morning">Morning (6-12 PM)</SelectItem>
               <SelectItem value="afternoon">Afternoon (12-6 PM)</SelectItem>
               <SelectItem value="evening">Evening (6-10 PM)</SelectItem>
@@ -83,7 +83,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
               <SelectValue placeholder="All types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All types</SelectItem>
+              <SelectItem value="any">All types</SelectItem>
               <SelectItem value="coffee">Coffee</SelectItem>
               <SelectItem value="casual">Casual</SelectItem>
               <SelectItem value="threshold">Threshold</SelectItem>
@@ -99,7 +99,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
               <SelectValue placeholder="All surfaces" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All surfaces</SelectItem>
+              <SelectItem value="any">All surfaces</SelectItem>
               <SelectItem value="paved">Paved</SelectItem>
               <SelectItem value="gravel">Gravel</SelectItem>
               <SelectItem value="mixed">Mixed</SelectItem>
