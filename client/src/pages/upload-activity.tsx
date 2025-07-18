@@ -123,7 +123,12 @@ export default function UploadActivityPage() {
 
   const handleCreateSoloActivity = () => {
     if (uploadedActivityData) {
-      createSoloActivityMutation.mutate(uploadedActivityData);
+      // Convert completedAt from string to Date object for the API
+      const activityData = {
+        ...uploadedActivityData,
+        completedAt: new Date(uploadedActivityData.completedAt),
+      };
+      createSoloActivityMutation.mutate(activityData);
     }
   };
 
