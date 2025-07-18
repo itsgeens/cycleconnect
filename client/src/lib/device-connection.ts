@@ -75,11 +75,13 @@ export class DeviceConnectionManager {
       console.error('Error connecting to device:', error);
       if (error instanceof DOMException) {
         if (error.name === 'NotFoundError') {
-          throw new Error('No compatible device found. Make sure your device is in pairing mode.');
+          throw new Error('No compatible device found. Make sure your device is in pairing mode and close to your computer.');
         } else if (error.name === 'SecurityError') {
-          throw new Error('Bluetooth access denied. Please enable Bluetooth permissions.');
+          throw new Error('Bluetooth access denied. Click the lock icon in your address bar → Site settings → Bluetooth → Allow. Or ensure you\'re using HTTPS.');
         } else if (error.name === 'NotSupportedError') {
-          throw new Error('Web Bluetooth not supported. Use Chrome, Edge, or Opera.');
+          throw new Error('Web Bluetooth not supported. Please use Chrome, Edge, or Opera browser.');
+        } else if (error.name === 'NotAllowedError') {
+          throw new Error('Bluetooth permission denied. Please enable Bluetooth permissions in your browser settings.');
         }
       }
       throw error;

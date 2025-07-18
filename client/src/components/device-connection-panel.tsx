@@ -42,6 +42,9 @@ export default function DeviceConnectionPanel({
     setWebBluetoothSupported(DeviceConnectionManager.isSupported());
   }, []);
 
+  // Check if we're on a secure connection
+  const isSecureConnection = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+
   // Query for user's saved devices
   const { data: savedDevices, isLoading } = useQuery({
     queryKey: ["/api/my-devices"],
@@ -228,6 +231,23 @@ export default function DeviceConnectionPanel({
             <li>• For Wahoo devices, press and hold the power button</li>
           </ul>
         </div>
+
+        {/* Bluetooth Permission Instructions */}
+        <Alert>
+          <AlertTriangle className="w-4 h-4" />
+          <AlertDescription>
+            <strong>Bluetooth Permission Required</strong>
+            <div className="mt-2 space-y-1 text-xs">
+              <p><strong>Chrome/Edge:</strong> Click the lock icon in the address bar → Site settings → Bluetooth → Allow</p>
+              <p><strong>Or:</strong> Go to Settings → Privacy & Security → Site Settings → Bluetooth → Allow this site</p>
+              {!isSecureConnection && (
+                <p className="text-red-600 font-medium">
+                  <strong>⚠️ Secure connection required:</strong> Web Bluetooth only works with HTTPS. Make sure your URL starts with https://
+                </p>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
 
         <Separator />
 
