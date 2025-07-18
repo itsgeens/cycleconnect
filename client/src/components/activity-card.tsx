@@ -41,14 +41,16 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
 
   // Calculate average speed based on active time if available
   const getAverageSpeed = () => {
-    if (activity.averageSpeed) {
-      return activity.averageSpeed;
-    }
-    // Fallback: calculate from distance and moving time
+    // First try to calculate from distance and moving time for accuracy
     if (activity.distance && activity.movingTime) {
       const distanceKm = parseFloat(activity.distance.toString());
       const timeHours = activity.movingTime / 3600;
-      return distanceKm / timeHours;
+      const calculatedSpeed = distanceKm / timeHours;
+      return calculatedSpeed;
+    }
+    // Fallback to stored average speed
+    if (activity.averageSpeed) {
+      return parseFloat(activity.averageSpeed.toString());
     }
     return null;
   };
@@ -76,7 +78,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
       <div className="relative">
         {/* GPX Map Preview */}
         <GPXMapPreview
-          gpxUrl={activity.gpxFilePath}
+          gpxUrl={`/api/gpx/${activity.gpxFilePath?.split('/').pop()}`}
           className="h-48"
           interactive={false}
         />

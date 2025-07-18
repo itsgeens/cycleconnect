@@ -72,7 +72,9 @@ export function parseGPXContent(gpxContent: string): GpxData {
                    content.match(/<TrackPointExtension>[\s\S]*?<hr>([^<]+)<\/hr>/);
     if (hrMatch) {
       heartRate = parseInt(hrMatch[1]);
-      heartRates.push(heartRate);
+      if (!isNaN(heartRate) && heartRate > 0) {
+        heartRates.push(heartRate);
+      }
     }
 
     trackPoints.push({
@@ -161,6 +163,7 @@ export function parseGPXContent(gpxContent: string): GpxData {
     averageSpeed,
     averageHeartRate,
     maxHeartRate,
+    calories: undefined, // Will be calculated separately if needed
     trackPoints,
   };
 }

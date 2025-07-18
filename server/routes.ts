@@ -549,6 +549,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve GPX files for map preview
+  app.get('/api/gpx/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(process.cwd(), 'uploads', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'GPX file not found' });
+    }
+    
+    res.setHeader('Content-Type', 'application/gpx+xml');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.sendFile(filePath);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
