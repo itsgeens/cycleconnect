@@ -1,18 +1,59 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import RideCard from "@/components/ride-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { authManager } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users } from "lucide-react";
 
 export default function MyRides() {
   const user = authManager.getState().user;
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [selectedRideId, setSelectedRideId] = useState<number | null>(null);
 
   const { data: myRides, isLoading } = useQuery({
     queryKey: ["/api/my-rides"],
   });
+
+  const leaveRideMutation = useMutation({
+    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/leave`),
+    onSuccess: () => {
+      toast({
+        title: "Left the ride",
+        description: "You're no longer part of this ride.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-rides"] });
+      setShowLeaveModal(false);
+      setSelectedRideId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to leave ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLeaveClick = (rideId: number) => {
+    setSelectedRideId(rideId);
+    setShowLeaveModal(true);
+  };
+
+  const confirmLeave = () => {
+    if (selectedRideId) {
+      leaveRideMutation.mutate(selectedRideId);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -44,7 +85,15 @@ export default function MyRides() {
                 ))
               ) : myRides?.all?.length > 0 ? (
                 myRides.all.map((ride: any) => (
-                  <RideCard key={ride.id} ride={ride} />
+                  <RideCard 
+                    key={ride.id} 
+                    ride={ride} 
+                    onJoin={() => {}} // No join functionality needed in My Rides
+                    onLeave={handleLeaveClick}
+                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    currentUserId={user?.id}
+                  />
                 ))
               ) : (
                 <div className="col-span-full text-center py-12">
@@ -71,7 +120,15 @@ export default function MyRides() {
                 ))
               ) : myRides?.organized?.length > 0 ? (
                 myRides.organized.map((ride: any) => (
-                  <RideCard key={ride.id} ride={ride} />
+                  <RideCard 
+                    key={ride.id} 
+                    ride={ride} 
+                    onJoin={() => {}} // No join functionality needed in My Rides
+                    onLeave={handleLeaveClick}
+                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    currentUserId={user?.id}
+                  />
                 ))
               ) : (
                 <div className="col-span-full text-center py-12">
@@ -98,7 +155,15 @@ export default function MyRides() {
                 ))
               ) : myRides?.joined?.length > 0 ? (
                 myRides.joined.map((ride: any) => (
-                  <RideCard key={ride.id} ride={ride} />
+                  <RideCard 
+                    key={ride.id} 
+                    ride={ride} 
+                    onJoin={() => {}} // No join functionality needed in My Rides
+                    onLeave={handleLeaveClick}
+                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    currentUserId={user?.id}
+                  />
                 ))
               ) : (
                 <div className="col-span-full text-center py-12">
@@ -113,6 +178,34 @@ export default function MyRides() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Leave Ride Confirmation Modal */}
+      <Dialog open={showLeaveModal} onOpenChange={setShowLeaveModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave Ride</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave this ride? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLeaveModal(false)}
+              disabled={leaveRideMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmLeave}
+              disabled={leaveRideMutation.isPending}
+            >
+              {leaveRideMutation.isPending ? "Leaving..." : "Leave Ride"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
