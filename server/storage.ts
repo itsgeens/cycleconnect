@@ -1,4 +1,4 @@
-import { users, rides, rideParticipants, follows, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow } from "@shared/schema";
+import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
@@ -59,6 +59,17 @@ export interface IStorage {
   getFollowingCount(userId: number): Promise<number>;
   getFollowers(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>>;
   getFollowing(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>>;
+
+  // Device operations
+  getUserDevices(userId: number): Promise<DeviceConnection[]>;
+  createDeviceConnection(device: InsertDeviceConnection): Promise<DeviceConnection>;
+  updateDeviceConnection(deviceId: string, userId: number, updates: Partial<DeviceConnection>): Promise<void>;
+  deleteDeviceConnection(deviceId: string, userId: number): Promise<void>;
+
+  // Activity matching operations
+  createActivityMatch(match: InsertActivityMatch): Promise<ActivityMatch>;
+  getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
+  getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -625,6 +636,79 @@ export class DatabaseStorage implements IStorage {
 
     const following = await followingQuery;
     return following;
+  }
+
+  // Device operations
+  async getUserDevices(userId: number): Promise<DeviceConnection[]> {
+    const devices = await db
+      .select()
+      .from(deviceConnections)
+      .where(eq(deviceConnections.userId, userId))
+      .orderBy(desc(deviceConnections.lastConnectedAt));
+    
+    return devices;
+  }
+
+  async createDeviceConnection(device: InsertDeviceConnection): Promise<DeviceConnection> {
+    const [newDevice] = await db
+      .insert(deviceConnections)
+      .values(device)
+      .returning();
+    
+    return newDevice;
+  }
+
+  async updateDeviceConnection(deviceId: string, userId: number, updates: Partial<DeviceConnection>): Promise<void> {
+    await db
+      .update(deviceConnections)
+      .set(updates)
+      .where(
+        and(
+          eq(deviceConnections.deviceId, deviceId),
+          eq(deviceConnections.userId, userId)
+        )
+      );
+  }
+
+  async deleteDeviceConnection(deviceId: string, userId: number): Promise<void> {
+    await db
+      .delete(deviceConnections)
+      .where(
+        and(
+          eq(deviceConnections.deviceId, deviceId),
+          eq(deviceConnections.userId, userId)
+        )
+      );
+  }
+
+  // Activity matching operations
+  async createActivityMatch(match: InsertActivityMatch): Promise<ActivityMatch> {
+    const [newMatch] = await db
+      .insert(activityMatches)
+      .values(match)
+      .returning();
+    
+    return newMatch;
+  }
+
+  async getActivityMatches(rideId: number): Promise<ActivityMatch[]> {
+    const matches = await db
+      .select()
+      .from(activityMatches)
+      .where(eq(activityMatches.rideId, rideId))
+      .orderBy(desc(activityMatches.matchedAt));
+    
+    return matches;
+  }
+
+  async getUserActivityMatches(userId: number): Promise<ActivityMatch[]> {
+    const matches = await db
+      .select()
+      .from(activityMatches)
+      .where(eq(activityMatches.userId, userId))
+      .orderBy(desc(activityMatches.matchedAt));
+    
+    return matches;
   }
 }
 

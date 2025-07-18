@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authManager } from "../lib/auth";
-import { Zap, User, LogOut } from "lucide-react";
+import { Zap, User, LogOut, TrendingUp, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   DropdownMenu,
@@ -62,14 +62,7 @@ export default function Navbar() {
               >
                 My Rides
               </Link>
-              <Link 
-                href="/my-stats" 
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
-                  location === "/my-stats" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
-                }`}
-              >
-                My Stats
-              </Link>
+
             </div>
           </div>
           
@@ -83,6 +76,18 @@ export default function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/my-stats" className="flex items-center w-full">
+                      <TrendingUp className="w-4 h-4 mr-2" />
+                      My Stats
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/manage-devices" className="flex items-center w-full">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Manage Devices
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout

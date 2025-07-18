@@ -11,6 +11,7 @@ import CreateRide from "@/pages/create-ride";
 import MyRides from "@/pages/my-rides";
 import MyStats from "@/pages/my-stats";
 import FollowersPage from "@/pages/followers";
+import ManageDevices from "@/pages/manage-devices";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/create" component={CreateRide} />
       <Route path="/my-rides" component={MyRides} />
       <Route path="/my-stats" component={MyStats} />
+      <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />
       <Route path="/ride/:id" component={RideDetail} />
       <Route component={NotFound} />
