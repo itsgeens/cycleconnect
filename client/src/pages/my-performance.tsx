@@ -295,7 +295,14 @@ export default function MyPerformance() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Uploaded:</span>
                   <span className="font-medium">
-                    {format(new Date(userActivityData.matchedAt), 'MMM d, h:mm a')}
+                    {(() => {
+                      const matchedDate = userActivityData.matchedAt || userActivityData.completedAt;
+                      if (matchedDate) {
+                        const date = new Date(matchedDate);
+                        return !isNaN(date.getTime()) ? format(date, 'MMM d, h:mm a') : 'Unknown';
+                      }
+                      return 'Unknown';
+                    })()}
                   </span>
                 </div>
               </div>
