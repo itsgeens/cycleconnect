@@ -13,6 +13,7 @@ import MyStats from "@/pages/my-stats";
 import FollowersPage from "@/pages/followers";
 import ManageDevices from "@/pages/manage-devices";
 import UploadActivity from "@/pages/upload-activity";
+import MyPerformance from "@/pages/my-performance";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />
       <Route path="/ride/:id" component={RideDetail} />
+      <Route path="/ride/:id/my-performance" component={MyPerformance} />
       <Route component={NotFound} />
     </Switch>
   );

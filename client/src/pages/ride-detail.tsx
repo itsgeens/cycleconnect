@@ -13,7 +13,7 @@ import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import GPXMapPreview from "@/components/gpx-map-preview";
 import LeaveRideModal from "@/components/leave-ride-modal";
-import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle, Upload } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle, Upload, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
@@ -243,6 +243,8 @@ export default function RideDetail() {
   const now = new Date();
   const hasRidePassed = rideDateTime.getTime() < now.getTime();
   const canComplete = isOwner && !ride.isCompleted && hasRidePassed;
+  const userActivityData = (ride as any)?.userActivityData;
+  const hasUploadedActivity = userActivityData && userActivityData.userId === user?.id;
   
   // Debug logging for datetime comparison
   console.log('DateTime comparison debug:', {
@@ -509,15 +511,26 @@ export default function RideDetail() {
                   {isParticipant ? (
                     <>
                       {ride.isCompleted && (
-                        <Button
-                          variant="default"
-                          className="w-full"
-                          onClick={() => setShowUploadModal(true)}
-                          disabled={uploadGpxMutation.isPending}
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Your Activity
-                        </Button>
+                        hasUploadedActivity ? (
+                          <Button
+                            variant="default"
+                            className="w-full"
+                            onClick={() => navigate(`/ride/${id}/my-performance`)}
+                          >
+                            <TrendingUp className="w-4 h-4 mr-2" />
+                            View My Performance
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="default"
+                            className="w-full"
+                            onClick={() => setShowUploadModal(true)}
+                            disabled={uploadGpxMutation.isPending}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Your Activity
+                          </Button>
+                        )
                       )}
                       <Button
                         variant="outline"
