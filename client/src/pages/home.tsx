@@ -56,10 +56,16 @@ export default function Home() {
         title: "Left the ride",
         description: "You're no longer part of this ride.",
       });
-      // Invalidate multiple related queries
+      // Invalidate multiple related queries and clear cache
+      queryClient.clear(); // Clear all cache
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
       queryClient.invalidateQueries({ queryKey: ["/api/my-rides"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-stats"] });
+      // Force immediate refetch with fresh data
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/my-rides"] });
+        queryClient.refetchQueries({ queryKey: ["/api/my-stats"] });
+      }, 100);
       setShowLeaveModal(false);
       setSelectedRide(null);
     },

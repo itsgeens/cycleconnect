@@ -22,7 +22,9 @@ export default function MyRides() {
   const { data: myRides, isLoading } = useQuery({
     queryKey: ["/api/my-rides"],
     staleTime: 0, // Always fetch fresh data
-    cacheTime: 0, // Don't cache the data
+    gcTime: 0, // Don't cache the data (updated property name)
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const leaveRideMutation = useMutation({
@@ -33,13 +35,17 @@ export default function MyRides() {
         description: "You're no longer part of this ride.",
       });
       // Invalidate multiple related queries and clear cache
+      queryClient.clear(); // Clear all cache
       queryClient.invalidateQueries({ queryKey: ["/api/my-rides"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
       queryClient.removeQueries({ queryKey: ["/api/my-rides"] });
       queryClient.removeQueries({ queryKey: ["/api/my-stats"] });
-      queryClient.refetchQueries({ queryKey: ["/api/my-rides"] });
-      queryClient.refetchQueries({ queryKey: ["/api/my-stats"] });
+      // Force immediate refetch with fresh data
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/my-rides"] });
+        queryClient.refetchQueries({ queryKey: ["/api/my-stats"] });
+      }, 100);
       setShowLeaveModal(false);
       setSelectedRide(null);
     },
