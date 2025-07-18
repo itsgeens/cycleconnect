@@ -4,6 +4,7 @@ import L from 'leaflet';
 interface GPXMapPreviewProps {
   gpxData?: string;
   gpxUrl?: string;
+  secondaryGpxUrl?: string; // For showing organizer's route
   className?: string;
   interactive?: boolean;
   showFullscreen?: boolean;
@@ -15,7 +16,7 @@ interface GPXStats {
   coordinates: [number, number][];
 }
 
-export default function GPXMapPreview({ gpxData, gpxUrl, className = "h-48", interactive = false, showFullscreen = false }: GPXMapPreviewProps) {
+export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, className = "h-48", interactive = false, showFullscreen = false }: GPXMapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const gpxLayerRef = useRef<L.Polyline | null>(null);
@@ -51,15 +52,36 @@ export default function GPXMapPreview({ gpxData, gpxUrl, className = "h-48", int
             gpxContent = await response.text();
           }
         } catch (error) {
-          console.error('Failed to load GPX file:', error);
-          return;
+          console.error('Failed to load primary GPX file:', error);
         }
       }
 
+      // Load secondary GPX (organizer's route)
+      let secondaryGpxContent = '';
+      if (secondaryGpxUrl) {
+        try {
+          const response = await fetch(secondaryGpxUrl);
+          if (response.ok) {
+            secondaryGpxContent = await response.text();
+          }
+        } catch (error) {
+          console.error('Failed to load secondary GPX file:', error);
+        }
+      }
+
+      // Display primary route (user's route) in green
       if (gpxContent) {
         const stats = parseGPXData(gpxContent);
         if (stats.coordinates.length > 0) {
-          displayGPXRoute(map, stats.coordinates);
+          displayGPXRoute(map, stats.coordinates, '#22c55e', 'My Route');
+        }
+      }
+
+      // Display secondary route (organizer's route) in blue
+      if (secondaryGpxContent) {
+        const secondaryStats = parseGPXData(secondaryGpxContent);
+        if (secondaryStats.coordinates.length > 0) {
+          displayGPXRoute(map, secondaryStats.coordinates, '#3b82f6', 'Planned Route');
         }
       }
     };
@@ -72,7 +94,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, className = "h-48", int
         mapInstanceRef.current = null;
       }
     };
-  }, [gpxData, gpxUrl, interactive]);
+  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]);
 
   const parseGPXData = (gpxContent: string): GPXStats => {
     const parser = new DOMParser();
@@ -130,27 +152,42 @@ export default function GPXMapPreview({ gpxData, gpxUrl, className = "h-48", int
     return R * c;
   };
 
-  const displayGPXRoute = (map: L.Map, coordinates: [number, number][]) => {
+  const displayGPXRoute = (map: L.Map, coordinates: [number, number][], color: string = '#3b82f6', label?: string) => {
     if (coordinates.length === 0) return;
 
-    // Remove existing layer
-    if (gpxLayerRef.current) {
-      map.removeLayer(gpxLayerRef.current);
-    }
-
     // Create route polyline
-    gpxLayerRef.current = L.polyline(coordinates, {
-      color: '#3b82f6',
+    const polyline = L.polyline(coordinates, {
+      color: color,
       weight: 3,
       opacity: 0.8
     }).addTo(map);
 
-    // Fit map to route bounds
-    const bounds = L.latLngBounds(coordinates);
-    map.fitBounds(bounds, { padding: [20, 20] });
+    // Add label if provided
+    if (label && coordinates.length > 0) {
+      const midPoint = coordinates[Math.floor(coordinates.length / 2)];
+      L.marker(midPoint, {
+        icon: L.divIcon({
+          className: 'route-label',
+          html: `<div style="background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;">${label}</div>`,
+          iconSize: [100, 20],
+          iconAnchor: [50, 10]
+        })
+      }).addTo(map);
+    }
 
-    // Add start and end markers
-    if (coordinates.length > 1) {
+    // Fit map to route bounds (only for the first route)
+    if (coordinates.length > 0 && !gpxLayerRef.current) {
+      const bounds = L.latLngBounds(coordinates);
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }
+
+    // Store reference to first route for cleanup
+    if (!gpxLayerRef.current) {
+      gpxLayerRef.current = polyline;
+    }
+
+    // Add start and end markers (only for the first route)
+    if (coordinates.length > 1 && !gpxLayerRef.current) {
       const startIcon = L.divIcon({
         html: '<div class="w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>',
         className: 'custom-marker',

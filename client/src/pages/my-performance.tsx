@@ -110,10 +110,10 @@ export default function MyPerformance() {
           <div className="text-right">
             <p className="text-sm text-gray-500">Completed on</p>
             <p className="font-medium">
-              {format(new Date(userActivityData.completedAt), 'EEEE, MMMM d, yyyy')}
+              {format(new Date(userActivityData.completedAt || activity.completedAt || activity.createdAt), 'EEEE, MMMM d, yyyy')}
             </p>
             <p className="text-sm text-gray-600">
-              {format(new Date(userActivityData.completedAt), 'h:mm a')}
+              {format(new Date(userActivityData.completedAt || activity.completedAt || activity.createdAt), 'h:mm a')}
             </p>
           </div>
         </div>
@@ -125,24 +125,39 @@ export default function MyPerformance() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Route className="w-5 h-5" />
-                My Route
+                {isSolo ? 'My Route' : 'Route Comparison'}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <GPXMapPreview
                 gpxUrl={userActivityData.gpxFilePath}
+                secondaryGpxUrl={!isSolo ? activity.gpxFilePath : undefined}
                 className="h-96"
                 interactive={true}
                 showFullscreen={true}
               />
-              {!isSolo && userActivityData.routeMatchPercentage && (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm font-medium text-green-800">
-                    Route Match: {userActivityData.routeMatchPercentage}%
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    Your route closely matched the planned ride route
-                  </p>
+              {!isSolo && (
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-1 bg-green-500 rounded"></div>
+                      <span>My Route</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-1 bg-blue-500 rounded"></div>
+                      <span>Planned Route</span>
+                    </div>
+                  </div>
+                  {userActivityData.routeMatchPercentage && (
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm font-medium text-green-800">
+                        Route Match: {userActivityData.routeMatchPercentage}%
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Your route closely matched the planned ride route
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
