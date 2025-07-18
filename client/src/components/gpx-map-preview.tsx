@@ -19,7 +19,7 @@ interface GPXStats {
 export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, className = "h-48", interactive = false, showFullscreen = false }: GPXMapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const gpxLayerRef = useRef<L.Polyline | null>(null);
+  const layersRef = useRef<L.Layer[]>([]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -89,6 +89,14 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     loadGPXData();
 
     return () => {
+      // Clean up layers
+      layersRef.current.forEach(layer => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.removeLayer(layer);
+        }
+      });
+      layersRef.current = [];
+      
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -162,10 +170,13 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       opacity: 0.8
     }).addTo(map);
 
+    // Store layer for cleanup
+    layersRef.current.push(polyline);
+
     // Add label if provided
     if (label && coordinates.length > 0) {
       const midPoint = coordinates[Math.floor(coordinates.length / 2)];
-      L.marker(midPoint, {
+      const labelMarker = L.marker(midPoint, {
         icon: L.divIcon({
           className: 'route-label',
           html: `<div style="background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;">${label}</div>`,
@@ -173,21 +184,19 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
           iconAnchor: [50, 10]
         })
       }).addTo(map);
+      
+      // Store label marker for cleanup
+      layersRef.current.push(labelMarker);
     }
 
     // Fit map to route bounds (only for the first route)
-    if (coordinates.length > 0 && !gpxLayerRef.current) {
+    if (coordinates.length > 0 && layersRef.current.length <= 2) {
       const bounds = L.latLngBounds(coordinates);
       map.fitBounds(bounds, { padding: [20, 20] });
     }
 
-    // Store reference to first route for cleanup
-    if (!gpxLayerRef.current) {
-      gpxLayerRef.current = polyline;
-    }
-
     // Add start and end markers (only for the first route)
-    if (coordinates.length > 1 && !gpxLayerRef.current) {
+    if (coordinates.length > 1 && layersRef.current.length <= 2) {
       const startIcon = L.divIcon({
         html: '<div class="w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>',
         className: 'custom-marker',
@@ -202,8 +211,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         iconAnchor: [6, 6]
       });
 
-      L.marker(coordinates[0], { icon: startIcon }).addTo(map);
-      L.marker(coordinates[coordinates.length - 1], { icon: endIcon }).addTo(map);
+      const startMarker = L.marker(coordinates[0], { icon: startIcon }).addTo(map);
+      const endMarker = L.marker(coordinates[coordinates.length - 1], { icon: endIcon }).addTo(map);
+      
+      // Store markers for cleanup
+      layersRef.current.push(startMarker, endMarker);
     }
   };
 

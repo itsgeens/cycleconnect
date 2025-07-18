@@ -32,6 +32,7 @@ export default function MyPerformance() {
   const activity = isSolo ? soloActivity : ride;
   const userActivityData = isSolo ? soloActivity : (ride as any)?.userActivityData;
   const { stats } = useGPXStats(userActivityData?.gpxFilePath);
+  const { stats: organizerStats } = useGPXStats(!isSolo ? activity?.gpxFilePath : null);
 
   if (isLoading) {
     return (
@@ -231,26 +232,24 @@ export default function MyPerformance() {
                 </div>
               )}
 
-              {userActivityData.averageHeartRate && (
-                <div className="flex items-center gap-3">
-                  <Heart className="w-5 h-5 text-red-500" />
-                  <div>
-                    <p className="font-medium">Average Heart Rate</p>
-                    <p className="text-lg font-bold text-red-600">
-                      {userActivityData.averageHeartRate} bpm
+              <div className="flex items-center gap-3">
+                <Heart className="w-5 h-5 text-red-500" />
+                <div>
+                  <p className="font-medium">Average Heart Rate</p>
+                  <p className="text-lg font-bold text-red-600">
+                    {userActivityData.averageHeartRate ? `${userActivityData.averageHeartRate} bpm` : 'N/A'}
+                  </p>
+                  {userActivityData.maxHeartRate && (
+                    <p className="text-sm text-gray-600">
+                      Max: {userActivityData.maxHeartRate} bpm
                     </p>
-                    {userActivityData.maxHeartRate && (
-                      <p className="text-sm text-gray-600">
-                        Max: {userActivityData.maxHeartRate} bpm
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 
-          {stats && (
+          {!isSolo && organizerStats && (
             <Card>
               <CardHeader>
                 <CardTitle>Route Comparison</CardTitle>
@@ -258,7 +257,7 @@ export default function MyPerformance() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Planned Distance:</span>
-                  <span className="font-medium">{stats.distance} km</span>
+                  <span className="font-medium">{organizerStats.distance.toFixed(2)} km</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Your Distance:</span>
@@ -266,7 +265,7 @@ export default function MyPerformance() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Planned Elevation:</span>
-                  <span className="font-medium">{stats.elevationGain} m</span>
+                  <span className="font-medium">{organizerStats.elevationGain.toFixed(0)} m</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Your Elevation:</span>
