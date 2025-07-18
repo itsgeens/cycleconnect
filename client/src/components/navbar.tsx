@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authManager } from "../lib/auth";
 import { Zap, User, LogOut } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +12,7 @@ import {
 
 export default function Navbar() {
   const [authState, setAuthState] = useState(authManager.getState());
+  const [location] = useLocation();
 
   useState(() => {
     const unsubscribe = authManager.subscribe(setAuthState);
@@ -36,26 +38,38 @@ export default function Navbar() {
           
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
-              <a 
-                href="#discover" 
-                className="text-gray-900 hover:text-cycling-blue px-3 py-2 text-sm font-medium transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById("discover")?.scrollIntoView({ behavior: "smooth" });
-                }}
+              <Link 
+                href="/" 
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  location === "/" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                }`}
               >
                 Discover Rides
-              </a>
-              <a 
-                href="#create" 
-                className="text-gray-500 hover:text-cycling-blue px-3 py-2 text-sm font-medium transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth" });
-                }}
+              </Link>
+              <Link 
+                href="/create" 
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  location === "/create" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                }`}
               >
                 Create Ride
-              </a>
+              </Link>
+              <Link 
+                href="/my-rides" 
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  location === "/my-rides" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                }`}
+              >
+                My Rides
+              </Link>
+              <Link 
+                href="/my-stats" 
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  location === "/my-stats" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                }`}
+              >
+                My Stats
+              </Link>
             </div>
           </div>
           

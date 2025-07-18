@@ -294,6 +294,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete ride route
+  app.post("/api/rides/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const rideId = parseInt(req.params.id);
+      await storage.completeRide(rideId, req.userId!);
+      res.json({ message: "Ride completed successfully" });
+    } catch (error) {
+      console.error("Complete ride error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // User rides routes
+  app.get("/api/my-rides", requireAuth, async (req, res) => {
+    try {
+      const myRides = await storage.getUserRides(req.userId!);
+      res.json(myRides);
+    } catch (error) {
+      console.error("Get user rides error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // User stats routes
+  app.get("/api/my-stats", requireAuth, async (req, res) => {
+    try {
+      const timeframe = req.query.timeframe as string || "last-month";
+      const stats = await storage.getUserStats(req.userId!, timeframe);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get user stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // User completed rides routes
+  app.get("/api/my-completed-rides", requireAuth, async (req, res) => {
+    try {
+      const limit = req.query.limit === "all" ? undefined : parseInt(req.query.limit as string) || 5;
+      const completedRides = await storage.getUserCompletedRides(req.userId!, limit);
+      res.json(completedRides);
+    } catch (error) {
+      console.error("Get user completed rides error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

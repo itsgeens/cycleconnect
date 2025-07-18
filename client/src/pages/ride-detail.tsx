@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useGPXStats } from "@/hooks/use-gpx-stats";
 import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import GPXMapPreview from "@/components/gpx-map-preview";
-import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
 import { useState, useEffect } from "react";
@@ -20,6 +21,7 @@ export default function RideDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = authManager.getUser();
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   const { data: ride, isLoading } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
@@ -85,6 +87,26 @@ export default function RideDetail() {
     },
   });
 
+  const completeRideMutation = useMutation({
+    mutationFn: () => apiRequest('POST', `/api/rides/${id}/complete`),
+    onSuccess: () => {
+      toast({
+        title: "Ride completed!",
+        description: "The ride has been marked as completed.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
+      setShowCompleteModal(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to complete ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -114,6 +136,9 @@ export default function RideDetail() {
 
   const isOwner = user?.id === ride.organizerId;
   const isParticipant = ride.participants?.some(p => p.id === user?.id);
+  const rideDate = new Date(ride.dateTime);
+  const now = new Date();
+  const canComplete = isOwner && !ride.isCompleted && rideDate < now;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -138,6 +163,39 @@ export default function RideDetail() {
           
           {isOwner && (
             <div className="flex gap-2">
+              {canComplete && (
+                <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm">
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Complete Ride
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Complete Ride</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to mark this ride as completed? This action cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowCompleteModal(false)}
+                        disabled={completeRideMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={() => completeRideMutation.mutate()}
+                        disabled={completeRideMutation.isPending}
+                      >
+                        {completeRideMutation.isPending ? "Completing..." : "Complete Ride"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
               <Button variant="outline" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
                 Edit

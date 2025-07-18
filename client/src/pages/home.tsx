@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
-import RideForm from "@/components/ride-form";
 import RideFilters from "@/components/ride-filters";
 import RideCard from "@/components/ride-card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, MapPin, Activity } from "lucide-react";
 
 export default function Home() {
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [filters, setFilters] = useState({});
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -66,12 +64,7 @@ export default function Home() {
     },
   });
 
-  const scrollToCreateForm = () => {
-    setShowCreateForm(true);
-    setTimeout(() => {
-      document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -100,7 +93,7 @@ export default function Home() {
                 size="lg" 
                 variant="outline" 
                 className="border-white text-white hover:bg-white hover:text-cycling-blue"
-                onClick={scrollToCreateForm}
+                onClick={() => navigate("/create")}
               >
                 Create a Ride
               </Button>
@@ -133,14 +126,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Create Ride Form */}
-      {showCreateForm && (
-        <section id="create-form" className="py-16 bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <RideForm onSuccess={() => setShowCreateForm(false)} />
-          </div>
-        </section>
-      )}
+
 
       {/* Ride Discovery */}
       <section id="discover" className="py-16 bg-white">
@@ -190,7 +176,7 @@ export default function Home() {
                   <h3 className="text-xl font-semibold">No rides found</h3>
                   <p>Try adjusting your filters or create a new ride to get started!</p>
                 </div>
-                <Button onClick={scrollToCreateForm} className="mt-4">
+                <Button onClick={() => navigate("/create")} className="mt-4">
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Ride
                 </Button>
@@ -203,7 +189,7 @@ export default function Home() {
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-40">
         <Button 
-          onClick={scrollToCreateForm}
+          onClick={() => navigate("/create")}
           size="icon"
           className="w-14 h-14 rounded-full shadow-lg bg-cycling-blue hover:bg-blue-600"
         >

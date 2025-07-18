@@ -7,6 +7,9 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Auth from "@/pages/auth";
 import RideDetail from "@/pages/ride-detail";
+import CreateRide from "@/pages/create-ride";
+import MyRides from "@/pages/my-rides";
+import MyStats from "@/pages/my-stats";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -25,6 +28,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/create" component={CreateRide} />
+      <Route path="/my-rides" component={MyRides} />
+      <Route path="/my-stats" component={MyStats} />
       <Route path="/ride/:id" component={RideDetail} />
       <Route component={NotFound} />
     </Switch>

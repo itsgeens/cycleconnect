@@ -23,6 +23,8 @@ export const rides = pgTable("rides", {
   meetupLocation: text("meetup_location").notNull(),
   meetupCoords: jsonb("meetup_coords").notNull(), // {lat: number, lng: number}
   organizerId: integer("organizer_id").references(() => users.id).notNull(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
