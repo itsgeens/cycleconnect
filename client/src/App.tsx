@@ -12,6 +12,7 @@ import Activities from "@/pages/activities";
 import MyStats from "@/pages/my-stats";
 import FollowersPage from "@/pages/followers";
 import ManageDevices from "@/pages/manage-devices";
+import UploadActivity from "@/pages/upload-activity";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/create" component={CreateRide} />
       <Route path="/activities" component={Activities} />
+      <Route path="/upload-activity" component={UploadActivity} />
       <Route path="/my-stats" component={MyStats} />
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />

@@ -37,8 +37,7 @@ export default function DeviceConnectionPanel({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedDevices, setConnectedDevices] = useState<DeviceConnection[]>([]);
   const [webBluetoothSupported, setWebBluetoothSupported] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
   // Check Web Bluetooth support on mount
@@ -126,56 +125,7 @@ export default function DeviceConnectionPanel({
     }
   };
 
-  // Handle manual GPX upload
-  const handleGpxUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.gpx')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload a GPX file",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('gpx', file);
-      formData.append('deviceName', 'Manual Upload');
-      formData.append('deviceType', 'cycling_computer');
-
-      const response = await fetch('/api/upload-activity', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload GPX file');
-      }
-
-      const result = await response.json();
-      
-      toast({
-        title: "GPX uploaded successfully",
-        description: `Activity uploaded and ready for route matching. ${result.matches ? `Found ${result.matches} potential ride matches.` : ''}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload GPX file",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
 
   // Get device icon
   const getDeviceIcon = (deviceType: string) => {
@@ -288,35 +238,7 @@ export default function DeviceConnectionPanel({
                 <div className="w-4 h-4 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center mt-0.5">1</div>
                 <div className="flex-1">
                   <p className="text-xs font-medium">Manual GPX Upload</p>
-                  <p className="text-xs text-muted-foreground mb-2">After your ride, upload your GPX file manually for automatic completion matching</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      accept=".gpx"
-                      onChange={handleGpxUpload}
-                      ref={fileInputRef}
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="text-xs h-7"
-                    >
-                      {isUploading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3 h-3 mr-1" />
-                          Upload GPX
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground">After your ride, use the "Upload Activity" page to upload your GPX file for automatic completion matching</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
@@ -360,7 +282,7 @@ export default function DeviceConnectionPanel({
               Alternative Methods
             </h4>
             <ul className="text-xs space-y-1 text-muted-foreground">
-              <li>• Upload GPX files manually</li>
+              <li>• Upload GPX files via "Upload Activity" page</li>
               <li>• Use Garmin Connect mobile app</li>
               <li>• Connect via smartphone bridge</li>
               <li>• ANT+ USB dongle (future support)</li>

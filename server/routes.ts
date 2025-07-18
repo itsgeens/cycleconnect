@@ -464,15 +464,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse GPX file to extract activity data
       const gpxData = await parseGPXFile(file.path);
       
-      // Try to match with existing joined rides
+      // Try to match with existing joined rides that are past due
       const userRides = await storage.getUserRides(userId);
-      const joinedRides = userRides.joined.filter(ride => !ride.isCompleted);
+      const currentTime = new Date();
+      const pastDueRides = userRides.joined.filter(ride => {
+        const rideDateTime = new Date(ride.dateTime);
+        return rideDateTime < currentTime && !ride.isCompleted;
+      });
       
       let bestMatch = null;
       let bestMatchScore = 0;
       
       // Simple route matching logic (can be enhanced)
-      for (const ride of joinedRides) {
+      for (const ride of pastDueRides) {
         try {
           const rideGpxData = await parseGPXFile(ride.gpxFilePath);
           const matchScore = calculateRouteMatch(gpxData, rideGpxData);
@@ -513,29 +517,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           matchScore: bestMatchScore,
         });
       } else {
-        // No match found - create solo activity
-        const activity = await storage.createSoloActivity({
-          name: `${deviceName || 'Manual'} Activity - ${new Date().toLocaleDateString()}`,
-          description: `Solo cycling activity uploaded from ${deviceName || 'device'}`,
-          activityType: 'cycling',
-          gpxFilePath: file.path,
-          distance: gpxData.distance?.toString(),
-          duration: gpxData.duration,
-          elevationGain: gpxData.elevationGain?.toString(),
-          averageSpeed: gpxData.averageSpeed?.toString(),
-          averageHeartRate: gpxData.averageHeartRate,
-          maxHeartRate: gpxData.maxHeartRate,
-          calories: gpxData.calories,
-          deviceName: deviceName || 'Manual Upload',
-          deviceType: deviceType || 'manual',
-          completedAt: new Date(),
-          userId,
-        });
-        
+        // No match found - return activity data for user to decide
         res.json({
-          message: "Solo activity created successfully",
-          activity,
-          matches: joinedRides.length,
+          message: "No matching rides found", 
+          matchedRide: null,
+          activityData: {
+            name: `Manual Activity - ${new Date().toLocaleDateString()}`,
+            description: `Solo cycling activity uploaded manually`,
+            activityType: 'cycling',
+            gpxFilePath: file.path,
+            distance: gpxData.distance?.toString(),
+            duration: gpxData.duration,
+            elevationGain: gpxData.elevationGain?.toString(),
+            averageSpeed: gpxData.averageSpeed?.toString(),
+            averageHeartRate: gpxData.averageHeartRate,
+            maxHeartRate: gpxData.maxHeartRate,
+            calories: gpxData.calories,
+            deviceName: deviceName || 'Manual Upload',
+            deviceType: deviceType || 'manual',
+            completedAt: new Date(),
+            userId,
+          },
+          matches: pastDueRides.length,
         });
       }
     } catch (error) {

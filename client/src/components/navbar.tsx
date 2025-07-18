@@ -62,6 +62,14 @@ export default function Navbar() {
               >
                 Activities
               </Link>
+              <Link 
+                href="/upload-activity" 
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  location === "/upload-activity" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                }`}
+              >
+                Upload Activity
+              </Link>
 
             </div>
           </div>
