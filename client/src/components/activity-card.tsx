@@ -146,7 +146,8 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
       activityId: activity.id,
       userActivityData: activity.userActivityData,
       distance: activity.distance,
-      hasUserData: !!activity.userActivityData
+      hasUserData: !!activity.userActivityData,
+      fullActivity: activity
     });
   }
 

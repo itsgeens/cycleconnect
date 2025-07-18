@@ -833,6 +833,8 @@ export class DatabaseStorage implements IStorage {
           )
           .limit(1);
 
+        console.log(`User activity data for ride ${ride.id}:`, userActivityData);
+
         return {
           ...ride,
           userActivityData,
