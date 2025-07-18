@@ -1,4 +1,5 @@
 import type { Express, Request } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertRideSchema, rideFiltersSchema } from "@shared/schema";
@@ -79,6 +80,9 @@ function requireAuth(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Clean up expired sessions every hour
   setInterval(cleanupExpiredSessions, 60 * 60 * 1000);
+
+  // Serve static files from uploads directory
+  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
   // Auth routes
   app.post("/api/register", async (req, res) => {
@@ -191,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ride = await storage.createRide({
         ...rideData,
         organizerId: req.userId!,
-        gpxFilePath: req.file.path,
+        gpxFilePath: `/uploads/${req.file.filename}`,
       });
 
       res.json(ride);

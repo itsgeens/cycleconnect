@@ -26,7 +26,7 @@ export default function RideCard({
   isLeaving = false,
   currentUserId 
 }: RideCardProps) {
-  const { stats } = useGPXStats(ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined);
+  const { stats } = useGPXStats(ride.gpxFilePath);
   
   const isParticipant = ride.participants?.some(p => p.id === currentUserId);
   const isOwner = ride.organizerId === currentUserId;
@@ -49,7 +49,7 @@ export default function RideCard({
       <div className="relative">
         {/* GPX Map Preview */}
         <GPXMapPreview
-          gpxUrl={ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined}
+          gpxUrl={ride.gpxFilePath}
           className="h-48"
           interactive={false}
         />

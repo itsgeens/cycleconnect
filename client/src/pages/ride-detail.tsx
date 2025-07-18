@@ -26,7 +26,7 @@ export default function RideDetail() {
     enabled: !!id,
   });
 
-  const { stats } = useGPXStats(ride?.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined);
+  const { stats } = useGPXStats(ride?.gpxFilePath);
 
   const joinRideMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/rides/${id}/join`),
@@ -167,7 +167,7 @@ export default function RideDetail() {
             </CardHeader>
             <CardContent>
               <GPXMapPreview
-                gpxUrl={ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined}
+                gpxUrl={ride.gpxFilePath}
                 className="h-96"
                 interactive={true}
                 showFullscreen={true}

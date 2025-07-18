@@ -170,7 +170,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, className = "h-48", int
     }
   };
 
-  if (!gpxData) {
+  if (!gpxData && !gpxUrl) {
     return (
       <div className={`${className} bg-gray-100 rounded-lg flex items-center justify-center`}>
         <p className="text-gray-500 text-sm">No route data available</p>

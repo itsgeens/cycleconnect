@@ -94,9 +94,32 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getRide(id: number): Promise<Ride | undefined> {
-    const [ride] = await db.select().from(rides).where(eq(rides.id, id));
-    return ride || undefined;
+  async getRide(id: number): Promise<(Ride & { organizer?: { name: string } }) | undefined> {
+    const [ride] = await db
+      .select({
+        id: rides.id,
+        name: rides.name,
+        description: rides.description,
+        dateTime: rides.dateTime,
+        rideType: rides.rideType,
+        surfaceType: rides.surfaceType,
+        gpxFilePath: rides.gpxFilePath,
+        meetupLocation: rides.meetupLocation,
+        meetupCoords: rides.meetupCoords,
+        organizerId: rides.organizerId,
+        createdAt: rides.createdAt,
+        organizerName: users.name,
+      })
+      .from(rides)
+      .leftJoin(users, eq(rides.organizerId, users.id))
+      .where(eq(rides.id, id));
+    
+    if (!ride) return undefined;
+    
+    return {
+      ...ride,
+      organizer: ride.organizerName ? { name: ride.organizerName } : undefined,
+    };
   }
 
   async joinRide(rideId: number, userId: number): Promise<void> {
