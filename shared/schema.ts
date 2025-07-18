@@ -224,7 +224,7 @@ export const insertDeviceConnectionSchema = createInsertSchema(deviceConnections
 
 export const insertActivityMatchSchema = createInsertSchema(activityMatches).omit({
   id: true,
-  createdAt: true,
+  matchedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

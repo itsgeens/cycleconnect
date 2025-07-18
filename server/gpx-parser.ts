@@ -10,6 +10,7 @@ export interface GpxData {
   averageHeartRate?: number; // in bpm
   maxHeartRate?: number; // in bpm
   calories?: number;
+  startTime?: Date; // start time of the activity
   trackPoints: Array<{
     lat: number;
     lon: number;
@@ -164,6 +165,7 @@ export function parseGPXContent(gpxContent: string): GpxData {
     averageHeartRate,
     maxHeartRate,
     calories: undefined, // Will be calculated separately if needed
+    startTime: minTime,
     trackPoints,
   };
 }

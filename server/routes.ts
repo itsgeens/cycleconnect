@@ -408,6 +408,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete ride with personal GPX data
+  app.post("/api/rides/:id/complete-with-data", requireAuth, upload.single("gpxFile"), async (req, res) => {
+    try {
+      const rideId = parseInt(req.params.id);
+      const userId = req.userId!;
+      
+      // Check if user is participant of the ride
+      const ride = await storage.getRide(rideId);
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      const isParticipant = await storage.isUserJoined(rideId, userId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Only participants can complete this ride with data" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "GPX file is required" });
+      }
+
+      // Parse GPX file to extract activity data
+      const gpxData = await parseGPXFile(req.file.path);
+      
+      // Store activity match data
+      await storage.createActivityMatch({
+        rideId,
+        userId,
+        deviceId: req.body.deviceId || 'manual',
+        routeMatchPercentage: '100.00', // Manually uploaded, assume 100% match
+        gpxFilePath: `/uploads/${req.file.filename}`,
+        distance: gpxData.distance?.toString(),
+        duration: gpxData.duration,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString(),
+        averageSpeed: gpxData.averageSpeed?.toString(),
+        averageHeartRate: gpxData.averageHeartRate,
+        maxHeartRate: gpxData.maxHeartRate,
+        calories: gpxData.calories,
+        completedAt: new Date(),
+      });
+
+      res.json({ 
+        message: "Ride completed with personal data successfully",
+        activityData: {
+          distance: gpxData.distance,
+          duration: gpxData.duration,
+          movingTime: gpxData.movingTime,
+          elevationGain: gpxData.elevationGain,
+          averageSpeed: gpxData.averageSpeed,
+          averageHeartRate: gpxData.averageHeartRate,
+          maxHeartRate: gpxData.maxHeartRate,
+        }
+      });
+    } catch (error) {
+      console.error("Complete ride with data error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
   // User rides routes
   app.get("/api/my-rides", requireAuth, async (req, res) => {
     try {

@@ -5,16 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGPXStats } from "@/hooks/use-gpx-stats";
 import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import GPXMapPreview from "@/components/gpx-map-preview";
 import LeaveRideModal from "@/components/leave-ride-modal";
-import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function RideDetail() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +27,9 @@ export default function RideDetail() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [gpxFile, setGpxFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ride, isLoading, error } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
@@ -142,6 +147,68 @@ export default function RideDetail() {
       });
     },
   });
+
+  const uploadGpxMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('gpxFile', file);
+      formData.append('deviceId', 'manual');
+      
+      return fetch(`/api/rides/${id}/complete-with-data`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authManager.getSessionId()}`,
+        },
+        body: formData,
+      }).then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to upload GPX file');
+        }
+        return res.json();
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Activity uploaded successfully!",
+        description: `Your personal ride data has been recorded. Distance: ${data.activityData.distance?.toFixed(1) || 'N/A'} km`,
+      });
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/completed-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-stats'] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
+      setShowUploadModal(false);
+      setGpxFile(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to upload activity",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.name.endsWith('.gpx')) {
+        setGpxFile(file);
+      } else {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a GPX file.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleUploadSubmit = () => {
+    if (gpxFile) {
+      uploadGpxMutation.mutate(gpxFile);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -424,16 +491,29 @@ export default function RideDetail() {
               <Separator className="my-4" />
 
               {!isOwner && (
-                <div>
+                <div className="space-y-2">
                   {isParticipant ? (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleLeaveClick}
-                      disabled={leaveRideMutation.isPending}
-                    >
-                      Leave Ride
-                    </Button>
+                    <>
+                      {ride.isCompleted && (
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          onClick={() => setShowUploadModal(true)}
+                          disabled={uploadGpxMutation.isPending}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Your Activity
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleLeaveClick}
+                        disabled={leaveRideMutation.isPending}
+                      >
+                        Leave Ride
+                      </Button>
+                    </>
                   ) : (
                     <Button
                       className="w-full"
@@ -458,6 +538,63 @@ export default function RideDetail() {
         isLoading={leaveRideMutation.isPending}
         rideName={ride?.name}
       />
+
+      {/* GPX Upload Modal */}
+      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Your Activity</DialogTitle>
+            <DialogDescription>
+              Share your GPX file from this ride to record your personal performance data.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="gpx-file">Select GPX File</Label>
+              <Input
+                id="gpx-file"
+                type="file"
+                accept=".gpx"
+                onChange={handleFileSelect}
+                ref={fileInputRef}
+              />
+            </div>
+            
+            {gpxFile && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium">Selected file:</p>
+                <p className="text-sm text-gray-600">{gpxFile.name}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Size: {(gpxFile.size / 1024).toFixed(1)} KB
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUploadModal(false);
+                setGpxFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+              disabled={uploadGpxMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadSubmit}
+              disabled={!gpxFile || uploadGpxMutation.isPending}
+            >
+              {uploadGpxMutation.isPending ? "Uploading..." : "Upload Activity"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
