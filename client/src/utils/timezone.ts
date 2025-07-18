@@ -48,17 +48,31 @@ export function formatDateInTimezone(date: Date | string, timezone: string, form
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   
   try {
-    // Create a date object in the target timezone
-    const timeInTimezone = new Date(dateObj.toLocaleString("en-US", { timeZone: timezone }));
+    // Use Intl.DateTimeFormat to properly format in the target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+    });
     
-    // For date formatting, use the timezone-adjusted date
+    const parts = formatter.formatToParts(dateObj);
+    const partsObj = parts.reduce((acc, part) => {
+      acc[part.type] = part.value;
+      return acc;
+    }, {} as any);
+    
     if (formatString === 'MMM d, yyyy') {
-      return format(timeInTimezone, formatString);
+      return `${partsObj.month} ${partsObj.day}, ${partsObj.year}`;
     } else if (formatString === 'h:mm a') {
-      return format(timeInTimezone, formatString);
+      return `${partsObj.hour}:${partsObj.minute} ${partsObj.dayPeriod}`;
     }
     
-    return format(timeInTimezone, formatString);
+    // Fallback to original format if pattern doesn't match
+    return format(dateObj, formatString);
   } catch (error) {
     console.warn('Error formatting date in timezone:', error);
     return format(dateObj, formatString);

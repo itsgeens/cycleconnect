@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx creator="StravaGPX" version="1.1" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+ <metadata>
+  <name>Test</name>
+  <author>
+   <name>Gino Tantuico</name>
+   <link href="https://www.strava.com/athletes/76447862"/>
+  </author>
+  <copyright author="OpenStreetMap contributors">
+   <year>2020</year>
+   <license>https://www.openstreetmap.org/copyright</license>
+  </copyright>
+  <link href="https://www.strava.com/routes/3381222181946299850"/>
+ </metadata>
+ <trk>
+  <name>Test</name>
+  <link href="https://www.strava.com/routes/3381222181946299850"/>
+  <type>running</type>
+  <trkseg>
+   <trkpt lat="14.40238" lon="121.01436000000001">
+    <ele>54.34</ele>
+   </trkpt>
+   <trkpt lat="14.402410000000001" lon="121.01527000000002">
+    <ele>54.96</ele>
+   </trkpt>
+   <trkpt lat="14.40238" lon="121.01532000000002">
+    <ele>54.96</ele>
+   </trkpt>
+   <trkpt lat="14.402370000000001" lon="121.01537">
+    <ele>55.010000000000005</ele>
+   </trkpt>
+   <trkpt lat="14.402280000000001" lon="121.01538000000001">
+    <ele>55.010000000000005</ele>
+   </trkpt>
+   <trkpt lat="14.401710000000001" lon="121.01524">
+    <ele>55.440000000000005</ele>
+   </trkpt>
+   <trkpt lat="14.401159999897725" lon="121.01508999958949">
+    <ele>55.81</ele>
+   </trkpt>
+   <trkpt lat="14.40061" lon="121.01494000000001">
+    <ele>56.17</ele>
+   </trkpt>
+   <trkpt lat="14.39995" lon="121.01480000000001">
+    <ele>56.580000000000005</ele>
+   </trkpt>
+   <trkpt lat="14.399200000057947" lon="121.01460999935694">
+    <ele>56.370000000000005</ele>
+   </trkpt>
+   <trkpt lat="14.39845" lon="121.01442000000002">
+    <ele>56.07</ele>
+   </trkpt>
+   <trkpt lat="14.397959999931638" lon="121.01428999968705">
+    <ele>56.32</ele>
+   </trkpt>
+   <trkpt lat="14.397470000000002" lon="121.01416">
+    <ele>56.99</ele>
+   </trkpt>
+   <trkpt lat="14.397390000000001" lon="121.01412">
+    <ele>57.07</ele>
+   </trkpt>
+   <trkpt lat="14.397385000730747" lon="121.01352999988615">
+    <ele>57.86</ele>
+   </trkpt>
+   <trkpt lat="14.397380000000002" lon="121.01294000000001">
+    <ele>58.79</ele>
+   </trkpt>
+   <trkpt lat="14.39737" lon="121.01284000000001">
+    <ele>58.980000000000004</ele>
+   </trkpt>
+   <trkpt lat="14.397870000000001" lon="121.01292000000001">
+    <ele>58.27</ele>
+   </trkpt>
+   <trkpt lat="14.398460000126711" lon="121.01305999927028">
+    <ele>57.410000000000004</ele>
+   </trkpt>
+   <trkpt lat="14.399050000171028" lon="121.0131999992808">
+    <ele>56.82</ele>
+   </trkpt>
+   <trkpt lat="14.399640000000002" lon="121.01334000000001">
+    <ele>56.36000000000001</ele>
+   </trkpt>
+   <trkpt lat="14.400260000000001" lon="121.01351000000001">
+    <ele>56.040000000000006</ele>
+   </trkpt>
+   <trkpt lat="14.400963333639885" lon="121.01375666512945">
+    <ele>55.38</ele>
+   </trkpt>
+   <trkpt lat="14.401666667023967" lon="121.01400333181387">
+    <ele>54.650000000000006</ele>
+   </trkpt>
+   <trkpt lat="14.402370000000001" lon="121.01425">
+    <ele>54.3</ele>
+   </trkpt>
+   <trkpt lat="14.40238" lon="121.01435000000001">
+    <ele>54.330000000000005</ele>
+   </trkpt>
+  </trkseg>
+ </trk>
+</gpx>

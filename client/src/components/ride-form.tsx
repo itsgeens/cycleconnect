@@ -78,7 +78,11 @@ export default function RideForm({ onSuccess }: RideFormProps) {
     const formDataToSend = new FormData();
     formDataToSend.append("name", formData.name);
     formDataToSend.append("description", formData.description);
-    formDataToSend.append("dateTime", formData.dateTime);
+    
+    // Convert the local datetime to ISO string for proper timezone handling
+    const localDateTime = new Date(formData.dateTime);
+    formDataToSend.append("dateTime", localDateTime.toISOString());
+    
     formDataToSend.append("rideType", formData.rideType);
     formDataToSend.append("surfaceType", formData.surfaceType);
     formDataToSend.append("meetupLocation", formData.meetupLocation);
