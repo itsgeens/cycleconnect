@@ -50,10 +50,17 @@ export class DatabaseStorage implements IStorage {
       .insert(rides)
       .values(rideData)
       .returning();
+    
+    // Automatically join the organizer to their own ride
+    await db.insert(rideParticipants).values({
+      rideId: ride.id,
+      userId: ride.organizerId,
+    });
+    
     return ride;
   }
 
-  async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number }>> {
+  async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>> {
     // Build the conditions array
     const conditions = [sql`${rides.dateTime} >= NOW()`];
     
@@ -87,14 +94,31 @@ export class DatabaseStorage implements IStorage {
       .groupBy(rides.id, users.id)
       .orderBy(asc(rides.dateTime));
 
-    return result.map(row => ({
-      ...row,
-      organizerName: row.organizerName || 'Unknown',
-      participantCount: Number(row.participantCount),
-    }));
+    // Get participants for each ride
+    const ridesWithParticipants = await Promise.all(
+      result.map(async (ride) => {
+        const participants = await db
+          .select({
+            id: users.id,
+            name: users.name,
+          })
+          .from(rideParticipants)
+          .innerJoin(users, eq(rideParticipants.userId, users.id))
+          .where(eq(rideParticipants.rideId, ride.id));
+
+        return {
+          ...ride,
+          organizerName: ride.organizerName || 'Unknown',
+          participantCount: Number(ride.participantCount),
+          participants,
+        };
+      })
+    );
+
+    return ridesWithParticipants;
   }
 
-  async getRide(id: number): Promise<(Ride & { organizer?: { name: string } }) | undefined> {
+  async getRide(id: number): Promise<(Ride & { organizer?: { name: string }; participants?: Array<{ id: number; name: string }> }) | undefined> {
     const [ride] = await db
       .select({
         id: rides.id,
@@ -116,9 +140,20 @@ export class DatabaseStorage implements IStorage {
     
     if (!ride) return undefined;
     
+    // Get participants for this ride
+    const participants = await db
+      .select({
+        id: users.id,
+        name: users.name,
+      })
+      .from(rideParticipants)
+      .innerJoin(users, eq(rideParticipants.userId, users.id))
+      .where(eq(rideParticipants.rideId, id));
+    
     return {
       ...ride,
       organizer: ride.organizerName ? { name: ride.organizerName } : undefined,
+      participants,
     };
   }
 
@@ -136,6 +171,21 @@ export class DatabaseStorage implements IStorage {
         eq(rideParticipants.userId, userId)
       )
     );
+  }
+
+  async isUserJoined(rideId: number, userId: number): Promise<boolean> {
+    const [participant] = await db
+      .select()
+      .from(rideParticipants)
+      .where(
+        and(
+          eq(rideParticipants.rideId, rideId),
+          eq(rideParticipants.userId, userId)
+        )
+      )
+      .limit(1);
+    
+    return !!participant;
   }
 
   async getRideParticipants(rideId: number): Promise<Array<RideParticipant & { userName: string }>> {
@@ -157,18 +207,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async isUserJoined(rideId: number, userId: number): Promise<boolean> {
-    const [result] = await db
-      .select()
-      .from(rideParticipants)
-      .where(
-        and(
-          eq(rideParticipants.rideId, rideId),
-          eq(rideParticipants.userId, userId)
-        )
-      );
-    return !!result;
-  }
+
 
   async deleteRide(rideId: number): Promise<void> {
     await db.transaction(async (tx) => {
