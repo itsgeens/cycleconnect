@@ -51,7 +51,14 @@ export const getQueryFn: <T>(options: {
       headers.Authorization = authHeaders.Authorization;
     }
 
-    const res = await fetch(queryKey.join("/") as string, {
+    // Handle query parameters from the query key
+    let url = queryKey[0] as string;
+    if (queryKey.length > 1 && typeof queryKey[1] === 'object') {
+      const params = new URLSearchParams(queryKey[1] as Record<string, string>);
+      url += `?${params.toString()}`;
+    }
+
+    const res = await fetch(url, {
       headers,
       credentials: "include",
     });

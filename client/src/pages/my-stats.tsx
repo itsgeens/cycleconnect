@@ -25,21 +25,11 @@ export default function MyStats() {
   const user = authManager.getState().user;
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/my-stats", timeframe],
-    queryFn: async () => {
-      const response = await fetch(`/api/my-stats?timeframe=${timeframe}`);
-      if (!response.ok) throw new Error("Failed to fetch stats");
-      return response.json();
-    },
+    queryKey: ["/api/my-stats", { timeframe }],
   });
 
   const { data: completedRides, isLoading: ridesLoading } = useQuery({
-    queryKey: ["/api/my-completed-rides", showAllRides ? "all" : "limited"],
-    queryFn: async () => {
-      const response = await fetch(`/api/my-completed-rides?limit=${showAllRides ? "all" : "5"}`);
-      if (!response.ok) throw new Error("Failed to fetch completed rides");
-      return response.json();
-    },
+    queryKey: ["/api/my-completed-rides", { limit: showAllRides ? "all" : "5" }],
   });
 
   const timeframeOptions = [

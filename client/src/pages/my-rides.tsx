@@ -12,11 +12,6 @@ export default function MyRides() {
 
   const { data: myRides, isLoading } = useQuery({
     queryKey: ["/api/my-rides"],
-    queryFn: async () => {
-      const response = await fetch("/api/my-rides");
-      if (!response.ok) throw new Error("Failed to fetch my rides");
-      return response.json();
-    },
   });
 
   return (
