@@ -128,9 +128,18 @@ The application follows a traditional full-stack architecture with clear separat
 - **API Endpoints**: Complete set of endpoints for device management, activity matching, and automatic ride completion
 - **Frontend Components**: DeviceConnectionPanel with real-time connection status and device management
 
+### Advanced Activity Tracking (July 18, 2025)
+- **Active vs Total Time Distinction**: GPX parser now calculates moving time (active) vs elapsed time (total)
+- **Enhanced Activity Cards**: Show embedded GPX route maps, active time prominently, and heart rate data
+- **Improved Speed Calculations**: Average speed based on active time for more accurate performance metrics
+- **Enhanced Heart Rate Display**: Shows both average and maximum heart rate when available from GPX files
+- **Multi-format GPX Support**: Enhanced parser supports multiple Garmin extension formats for heart rate data
+- **Visual Improvements**: Activity cards now feature route previews similar to ride cards with better data presentation
+
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
 - **Time Window Validation**: Automatic completion only if activity starts within 1 hour of planned ride time
 - **Multi-Protocol Support**: Both Bluetooth Low Energy and ANT+ bridge compatibility
 - **Real-time Monitoring**: Live data streaming from connected devices during rides
 - **Automatic Validation**: 85% route similarity threshold with configurable parameters
+- **Active Time Calculation**: Moving time excludes stops below 0.5 km/h threshold for accurate performance metrics

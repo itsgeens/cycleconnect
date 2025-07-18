@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import GPXMapPreview from "@/components/gpx-map-preview";
 import { 
   Clock, 
   MapPin, 
@@ -38,6 +39,20 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
     return kmh ? `${parseFloat(kmh.toString()).toFixed(1)} km/h` : 'N/A';
   };
 
+  // Calculate average speed based on active time if available
+  const getAverageSpeed = () => {
+    if (activity.averageSpeed) {
+      return activity.averageSpeed;
+    }
+    // Fallback: calculate from distance and moving time
+    if (activity.distance && activity.movingTime) {
+      const distanceKm = parseFloat(activity.distance.toString());
+      const timeHours = activity.movingTime / 3600;
+      return distanceKm / timeHours;
+    }
+    return null;
+  };
+
   const formatElevation = (meters: number) => {
     return meters ? `${Math.round(parseFloat(meters.toString()))} m` : 'N/A';
   };
@@ -58,23 +73,41 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
       } hover:border-gray-300`}
       onClick={isGroup ? handleCardClick : undefined}
     >
+      <div className="relative">
+        {/* GPX Map Preview */}
+        <GPXMapPreview
+          gpxUrl={activity.gpxFilePath}
+          className="h-48"
+          interactive={false}
+        />
+        
+        {/* Activity Type Badge */}
+        <div className="absolute top-2 left-2 flex gap-1">
+          <Badge variant="secondary" className={`text-xs ${
+            isGroup ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+          }`}>
+            {isGroup ? 'Group Ride' : 'Solo Activity'}
+          </Badge>
+          {activity.activityType && (
+            <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">
+              {activity.activityType}
+            </Badge>
+          )}
+        </div>
+      </div>
+      
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center gap-2">
-                {isGroup ? (
-                  <Users className="w-5 h-5 text-blue-600" />
-                ) : (
-                  <Activity className="w-5 h-5 text-green-600" />
-                )}
-                <h3 className="font-semibold text-lg text-gray-900">
-                  {activity.name}
-                </h3>
-              </div>
-              <Badge variant={isGroup ? "default" : "secondary"}>
-                {isGroup ? 'Group Ride' : 'Solo Activity'}
-              </Badge>
+            <div className="flex items-center gap-2 mb-2">
+              {isGroup ? (
+                <Users className="w-5 h-5 text-blue-600" />
+              ) : (
+                <Activity className="w-5 h-5 text-green-600" />
+              )}
+              <h3 className="font-semibold text-lg text-gray-900">
+                {activity.name}
+              </h3>
             </div>
             
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
@@ -111,11 +144,11 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-500" />
             <div>
-              <p className="text-xs text-gray-500">Time</p>
+              <p className="text-xs text-gray-500">Active Time</p>
               <div className="font-medium">
                 {activity.movingTime ? (
                   <div>
-                    <div className="text-green-600">Active: {formatDuration(activity.movingTime)}</div>
+                    <div className="text-green-600 font-semibold">{formatDuration(activity.movingTime)}</div>
                     {activity.duration && activity.duration !== activity.movingTime && (
                       <div className="text-xs text-gray-500">Total: {formatDuration(activity.duration)}</div>
                     )}
@@ -144,8 +177,11 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div>
               <p className="text-xs text-gray-500">Avg Speed</p>
               <p className="font-medium">
-                {formatSpeed(activity.averageSpeed)}
+                {formatSpeed(getAverageSpeed())}
               </p>
+              {activity.movingTime && (
+                <p className="text-xs text-gray-500">Based on active time</p>
+              )}
             </div>
           </div>
 
@@ -153,10 +189,13 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div className="flex items-center gap-2">
               <Heart className="w-4 h-4 text-red-500" />
               <div>
-                <p className="text-xs text-gray-500">Avg HR</p>
+                <p className="text-xs text-gray-500">Heart Rate</p>
                 <p className="font-medium">
-                  {activity.averageHeartRate} bpm
+                  Avg: {activity.averageHeartRate} bpm
                 </p>
+                {activity.maxHeartRate && (
+                  <p className="text-xs text-gray-500">Max: {activity.maxHeartRate} bpm</p>
+                )}
               </div>
             </div>
           )}
