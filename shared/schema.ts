@@ -203,12 +203,17 @@ export const activityMatches = pgTable("activity_matches", {
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   deviceId: varchar("device_id", { length: 255 }).notNull(),
   routeMatchPercentage: decimal("route_match_percentage", { precision: 5, scale: 2 }).notNull(),
-  timeWindowMatch: boolean("time_window_match").notNull(),
-  isAutoCompleted: boolean("is_auto_completed").default(false),
-  gpxData: json("gpx_data"), // Store the uploaded GPX track data
-  matchingDetails: json("matching_details"), // Store detailed matching results
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  processedAt: timestamp("processed_at"),
+  gpxFilePath: text("gpx_file_path").notNull(),
+  distance: decimal("distance", { precision: 10, scale: 2 }),
+  duration: integer("duration"),
+  movingTime: integer("moving_time"),
+  elevationGain: decimal("elevation_gain", { precision: 10, scale: 2 }),
+  averageSpeed: decimal("average_speed", { precision: 10, scale: 2 }),
+  averageHeartRate: integer("average_heart_rate"),
+  maxHeartRate: integer("max_heart_rate"),
+  calories: integer("calories"),
+  completedAt: timestamp("completed_at").notNull(),
+  matchedAt: timestamp("matched_at").defaultNow().notNull(),
 });
 
 // Zod schemas for device connections
