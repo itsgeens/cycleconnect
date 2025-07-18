@@ -255,6 +255,14 @@ export default function RideDetail() {
     isCompleted: ride.isCompleted,
     canComplete
   });
+  
+  // Debug logging for activity data
+  console.log('Activity data debug:', {
+    userActivityData,
+    hasUploadedActivity,
+    userId: user?.id,
+    activityUserId: userActivityData?.userId
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">

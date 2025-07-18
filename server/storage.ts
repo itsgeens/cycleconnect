@@ -70,6 +70,7 @@ export interface IStorage {
   createActivityMatch(match: InsertActivityMatch): Promise<ActivityMatch>;
   getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
   getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
+  getUserActivityForRide(rideId: number, userId: number): Promise<ActivityMatch | undefined>;
 
   // Solo activities operations
   createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity>;
@@ -856,6 +857,20 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(activityMatches.matchedAt));
     
     return matches;
+  }
+
+  async getUserActivityForRide(rideId: number, userId: number): Promise<ActivityMatch | undefined> {
+    const [activity] = await db
+      .select()
+      .from(activityMatches)
+      .where(
+        and(
+          eq(activityMatches.rideId, rideId),
+          eq(activityMatches.userId, userId)
+        )
+      )
+      .limit(1);
+    return activity || undefined;
   }
 
   // Solo activities operations

@@ -313,6 +313,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!ride) {
         return res.status(404).json({ message: "Ride not found" });
       }
+      
+      // If user is authenticated, include their activity data for this ride
+      const sessionId = req.headers.authorization?.replace("Bearer ", "");
+      if (sessionId) {
+        const session = sessions.get(sessionId);
+        if (session && session.expires > new Date()) {
+          const userId = session.userId;
+          
+          // Get user's activity data for this ride
+          const userActivityData = await storage.getUserActivityForRide(rideId, userId);
+          
+          res.json({
+            ...ride,
+            userActivityData,
+          });
+          return;
+        }
+      }
+      
       res.json(ride);
     } catch (error) {
       console.error("Get ride error:", error);
