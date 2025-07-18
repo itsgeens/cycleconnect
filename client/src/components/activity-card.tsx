@@ -12,6 +12,12 @@ import {
   AlertDialogTitle, 
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import GPXMapPreview from "@/components/gpx-map-preview";
 import { 
@@ -32,6 +38,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface ActivityCardProps {
   activity: any;
@@ -41,6 +48,7 @@ interface ActivityCardProps {
 export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const [, navigate] = useLocation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -112,6 +120,12 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const completedDate = activity.completedAt || activity.createdAt;
   const isGroup = type === 'group';
 
+  // Query to get activity matches for group rides
+  const { data: activityMatches, isLoading: isLoadingMatches } = useQuery({
+    queryKey: ["/api/rides", activity.id, "activity-matches"],
+    enabled: isGroup && showParticipantsModal,
+  });
+
   return (
     <Card 
       className={`w-full transition-all duration-200 ${
@@ -182,7 +196,11 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div>
               <p className="text-xs text-gray-500">Distance</p>
               <p className="font-medium">
-                {formatDistance(activity.distance)}
+                {formatDistance(
+                  isGroup && activity.userActivityData?.distance 
+                    ? activity.userActivityData.distance 
+                    : activity.distance
+                )}
               </p>
             </div>
           </div>
@@ -192,18 +210,25 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div>
               <p className="text-xs text-gray-500">Active Time</p>
               <div className="font-medium">
-                {activity.movingTime ? (
-                  <div>
-                    <div className="text-green-600 font-semibold">{formatDuration(activity.movingTime)}</div>
-                    {activity.duration && activity.duration !== activity.movingTime && (
-                      <div className="text-xs text-gray-500">Total: {formatDuration(activity.duration)}</div>
-                    )}
-                  </div>
-                ) : activity.duration ? (
-                  formatDuration(activity.duration)
-                ) : (
-                  'N/A'
-                )}
+                {(() => {
+                  const userMovingTime = isGroup && activity.userActivityData?.movingTime;
+                  const userDuration = isGroup && activity.userActivityData?.duration;
+                  const movingTime = userMovingTime || activity.movingTime;
+                  const duration = userDuration || activity.duration;
+                  
+                  return movingTime ? (
+                    <div>
+                      <div className="text-green-600 font-semibold">{formatDuration(movingTime)}</div>
+                      {duration && duration !== movingTime && (
+                        <div className="text-xs text-gray-500">Total: {formatDuration(duration)}</div>
+                      )}
+                    </div>
+                  ) : duration ? (
+                    formatDuration(duration)
+                  ) : (
+                    'N/A'
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -213,7 +238,11 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div>
               <p className="text-xs text-gray-500">Elevation</p>
               <p className="font-medium">
-                {formatElevation(activity.elevationGain)}
+                {formatElevation(
+                  isGroup && activity.userActivityData?.elevationGain 
+                    ? activity.userActivityData.elevationGain 
+                    : activity.elevationGain
+                )}
               </p>
             </div>
           </div>
@@ -223,36 +252,48 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div>
               <p className="text-xs text-gray-500">Avg Speed</p>
               <p className="font-medium">
-                {formatSpeed(getAverageSpeed())}
+                {formatSpeed(
+                  isGroup && activity.userActivityData?.averageSpeed 
+                    ? activity.userActivityData.averageSpeed 
+                    : getAverageSpeed()
+                )}
               </p>
-              {activity.movingTime && (
+              {(activity.movingTime || activity.userActivityData?.movingTime) && (
                 <p className="text-xs text-gray-500">Based on active time</p>
               )}
             </div>
           </div>
 
-          {activity.averageHeartRate && (
+          {((isGroup && activity.userActivityData?.averageHeartRate) || (!isGroup && activity.averageHeartRate)) && (
             <div className="flex items-center gap-2">
               <Heart className="w-4 h-4 text-red-500" />
               <div>
                 <p className="text-xs text-gray-500">Heart Rate</p>
                 <p className="font-medium">
-                  Avg: {activity.averageHeartRate} bpm
+                  Avg: {isGroup && activity.userActivityData?.averageHeartRate 
+                    ? activity.userActivityData.averageHeartRate 
+                    : activity.averageHeartRate} bpm
                 </p>
-                {activity.maxHeartRate && (
-                  <p className="text-xs text-gray-500">Max: {activity.maxHeartRate} bpm</p>
+                {((isGroup && activity.userActivityData?.maxHeartRate) || (!isGroup && activity.maxHeartRate)) && (
+                  <p className="text-xs text-gray-500">
+                    Max: {isGroup && activity.userActivityData?.maxHeartRate 
+                      ? activity.userActivityData.maxHeartRate 
+                      : activity.maxHeartRate} bpm
+                  </p>
                 )}
               </div>
             </div>
           )}
 
-          {activity.deviceName && (
+          {(activity.deviceName || activity.userActivityData?.deviceId) && (
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-gray-500" />
               <div>
                 <p className="text-xs text-gray-500">Device</p>
                 <p className="font-medium text-xs">
-                  {activity.deviceName}
+                  {isGroup && activity.userActivityData?.deviceId 
+                    ? activity.userActivityData.deviceId 
+                    : activity.deviceName}
                 </p>
               </div>
             </div>
@@ -270,6 +311,18 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
                 <Badge variant="outline" className="text-xs">
                   {activity.surfaceType || 'paved'}
                 </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowParticipantsModal(true);
+                  }}
+                  className="text-xs"
+                >
+                  <Users className="w-3 h-3 mr-1" />
+                  View All Participants
+                </Button>
               </div>
             )}
             {!isGroup && activity.activityType && (
@@ -331,6 +384,94 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           </div>
         </div>
       </CardContent>
+
+      {/* Participants Modal */}
+      <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Participants Performance - {activity.name}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {isLoadingMatches ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-600 mt-2">Loading participant data...</p>
+              </div>
+            ) : activityMatches && activityMatches.length > 0 ? (
+              <div className="space-y-4">
+                {activityMatches.map((match: any) => (
+                  <div key={match.id} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{match.userName}</h4>
+                        <p className="text-sm text-gray-600">
+                          Completed on {format(new Date(match.completedAt), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {parseFloat(match.routeMatchPercentage).toFixed(0)}% match
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-blue-600">
+                          {formatDistance(match.distance)}
+                        </div>
+                        <div className="text-xs text-gray-600">Distance</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-green-600">
+                          {formatDuration(match.movingTime || match.duration)}
+                        </div>
+                        <div className="text-xs text-gray-600">Active Time</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-purple-600">
+                          {formatElevation(match.elevationGain)}
+                        </div>
+                        <div className="text-xs text-gray-600">Elevation</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-orange-600">
+                          {formatSpeed(match.averageSpeed)}
+                        </div>
+                        <div className="text-xs text-gray-600">Avg Speed</div>
+                      </div>
+                    </div>
+                    
+                    {match.averageHeartRate && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Heart className="w-4 h-4 text-red-500" />
+                            <span className="text-sm text-gray-600">Heart Rate:</span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Avg: {match.averageHeartRate} bpm</span>
+                            {match.maxHeartRate && (
+                              <span className="ml-3 text-gray-600">Max: {match.maxHeartRate} bpm</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Individual Data</h3>
+                <p className="text-gray-600">
+                  No individual performance data found for this group ride.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

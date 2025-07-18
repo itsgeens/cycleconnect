@@ -711,6 +711,38 @@ export class DatabaseStorage implements IStorage {
     return matches;
   }
 
+  async getRideActivityMatches(rideId: number): Promise<Array<ActivityMatch & { userName: string }>> {
+    const matches = await db
+      .select({
+        id: activityMatches.id,
+        rideId: activityMatches.rideId,
+        userId: activityMatches.userId,
+        deviceId: activityMatches.deviceId,
+        routeMatchPercentage: activityMatches.routeMatchPercentage,
+        gpxFilePath: activityMatches.gpxFilePath,
+        distance: activityMatches.distance,
+        duration: activityMatches.duration,
+        movingTime: activityMatches.movingTime,
+        elevationGain: activityMatches.elevationGain,
+        averageSpeed: activityMatches.averageSpeed,
+        averageHeartRate: activityMatches.averageHeartRate,
+        maxHeartRate: activityMatches.maxHeartRate,
+        calories: activityMatches.calories,
+        completedAt: activityMatches.completedAt,
+        matchedAt: activityMatches.matchedAt,
+        userName: users.name,
+      })
+      .from(activityMatches)
+      .leftJoin(users, eq(activityMatches.userId, users.id))
+      .where(eq(activityMatches.rideId, rideId))
+      .orderBy(desc(activityMatches.matchedAt));
+    
+    return matches.map(row => ({
+      ...row,
+      userName: row.userName || 'Unknown',
+    }));
+  }
+
   async getUserActivityMatches(userId: number): Promise<ActivityMatch[]> {
     const matches = await db
       .select()
@@ -751,7 +783,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserCompletedActivities(userId: number): Promise<{
-    completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
+    completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date; userActivityData?: ActivityMatch }>;
     soloActivities: SoloActivity[];
   }> {
     // Get completed rides (both organized and joined)
@@ -787,11 +819,32 @@ export class DatabaseStorage implements IStorage {
       .groupBy(rides.id, users.name)
       .orderBy(desc(rides.completedAt));
 
+    // Get user's activity data for each completed ride
+    const ridesWithUserData = await Promise.all(
+      completedRides.map(async (ride) => {
+        const [userActivityData] = await db
+          .select()
+          .from(activityMatches)
+          .where(
+            and(
+              eq(activityMatches.rideId, ride.id),
+              eq(activityMatches.userId, userId)
+            )
+          )
+          .limit(1);
+
+        return {
+          ...ride,
+          userActivityData,
+        };
+      })
+    );
+
     // Get solo activities
     const soloActivities = await this.getUserSoloActivities(userId);
 
     return {
-      completedRides: completedRides as any[],
+      completedRides: ridesWithUserData as any[],
       soloActivities,
     };
   }

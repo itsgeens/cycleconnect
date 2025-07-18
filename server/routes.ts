@@ -360,6 +360,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/rides/:id/activity-matches", async (req, res) => {
+    try {
+      const rideId = parseInt(req.params.id);
+      const activityMatches = await storage.getRideActivityMatches(rideId);
+      res.json(activityMatches);
+    } catch (error) {
+      console.error("Get activity matches error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.delete("/api/rides/:id", requireAuth, async (req, res) => {
     try {
       const rideId = parseInt(req.params.id);
