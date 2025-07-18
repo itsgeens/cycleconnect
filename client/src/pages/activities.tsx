@@ -112,13 +112,8 @@ export default function Activities() {
     ...(myRides?.joined || [])
   ].filter(ride => !ride.isCompleted);
 
-  const completedRides = [
-    ...(myRides?.organized || []),
-    ...(myRides?.joined || [])
-  ].filter(ride => ride.isCompleted);
-
   const allCompletedActivities = [
-    ...completedRides,
+    ...(completedActivities?.completedRides || []),
     ...(completedActivities?.soloActivities || [])
   ].sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
 
