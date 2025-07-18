@@ -182,7 +182,6 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           )}
         </div>
       </div>
-      
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
@@ -368,9 +367,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
                   e.stopPropagation();
                   navigate(`/ride/${activity.id}`);
                 }}
-              >
-                View Ride Details
-              </Button>
+              >View Event Details</Button>
             )}
             {!isGroup && (
               <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -407,7 +404,6 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           </div>
         </div>
       </CardContent>
-
       {/* Participants Modal for Group Rides */}
       {isGroup && (
         <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
