@@ -53,6 +53,13 @@ export const getQueryFn: <T>(options: {
 
     // Handle query parameters from the query key
     let url = queryKey[0] as string;
+    
+    // Handle route parameters (e.g., ['/api/rides', '4'] -> '/api/rides/4')
+    if (queryKey.length > 1 && typeof queryKey[1] === 'string') {
+      url += `/${queryKey[1]}`;
+    }
+    
+    // Handle query string parameters
     if (queryKey.length > 1 && typeof queryKey[1] === 'object') {
       const params = new URLSearchParams(queryKey[1] as Record<string, string>);
       url += `?${params.toString()}`;
