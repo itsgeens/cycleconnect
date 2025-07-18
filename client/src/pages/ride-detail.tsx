@@ -26,7 +26,7 @@ export default function RideDetail() {
     enabled: !!id,
   });
 
-  const { stats } = useGPXStats(ride?.gpxFile ? `/uploads/${ride.gpxFile}` : undefined);
+  const { stats } = useGPXStats(ride?.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined);
 
   const joinRideMutation = useMutation({
     mutationFn: () => apiRequest(`/api/rides/${id}/join`, { method: 'POST' }),
@@ -164,7 +164,7 @@ export default function RideDetail() {
             </CardHeader>
             <CardContent>
               <GPXMapPreview
-                gpxUrl={ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined}
+                gpxUrl={ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined}
                 className="h-96"
                 interactive={true}
                 showFullscreen={true}
@@ -194,10 +194,24 @@ export default function RideDetail() {
                 <Calendar className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="font-medium">
-                    {format(new Date(ride.date), 'EEEE, MMMM d, yyyy')}
+                    {(() => {
+                      try {
+                        const date = new Date(ride.dateTime);
+                        return isNaN(date.getTime()) ? 'Invalid date' : format(date, 'EEEE, MMMM d, yyyy');
+                      } catch (error) {
+                        return 'Invalid date';
+                      }
+                    })()}
                   </p>
                   <p className="text-sm text-gray-600">
-                    {format(new Date(ride.date), 'h:mm a')}
+                    {(() => {
+                      try {
+                        const date = new Date(ride.dateTime);
+                        return isNaN(date.getTime()) ? 'Invalid time' : format(date, 'h:mm a');
+                      } catch (error) {
+                        return 'Invalid time';
+                      }
+                    })()}
                   </p>
                 </div>
               </div>

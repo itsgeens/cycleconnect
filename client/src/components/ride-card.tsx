@@ -26,7 +26,7 @@ export default function RideCard({
   isLeaving = false,
   currentUserId 
 }: RideCardProps) {
-  const { stats } = useGPXStats(ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined);
+  const { stats } = useGPXStats(ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined);
   
   const isParticipant = ride.participants?.some(p => p.id === currentUserId);
   const isOwner = ride.organizerId === currentUserId;
@@ -49,7 +49,7 @@ export default function RideCard({
       <div className="relative">
         {/* GPX Map Preview */}
         <GPXMapPreview
-          gpxUrl={ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined}
+          gpxUrl={ride.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined}
           className="h-48"
           interactive={false}
         />
@@ -88,10 +88,10 @@ export default function RideCard({
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4 text-gray-500" />
             <span className="font-medium">
-              {ride.date ? format(new Date(ride.date), 'MMM d, yyyy') : 'Date TBD'}
+              {ride.dateTime ? format(new Date(ride.dateTime), 'MMM d, yyyy') : 'Date TBD'}
             </span>
             <span className="text-gray-600">
-              {ride.date ? format(new Date(ride.date), 'h:mm a') : ''}
+              {ride.dateTime ? format(new Date(ride.dateTime), 'h:mm a') : ''}
             </span>
           </div>
 
