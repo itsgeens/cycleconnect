@@ -38,6 +38,9 @@ export function getTimezoneFromCoordinates(lat: number, lon: number): string {
     if (lon >= 135) return timezoneMap['asia-east'];
     if (lon >= 110) return timezoneMap['asia-southeast'];
     return timezoneMap['asia-south'];
+  } else if (lat >= 10 && lat <= 20 && lon >= 115 && lon <= 125) {
+    // Philippines/Singapore region
+    return 'Asia/Singapore';
   }
   
   // Fallback to user's local timezone
@@ -55,7 +58,7 @@ export function formatDateInTimezone(date: Date | string, timezone: string, form
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
-      minute: 'numeric',
+      minute: '2-digit',
       hour12: true,
     });
     

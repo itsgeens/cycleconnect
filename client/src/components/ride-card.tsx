@@ -45,14 +45,6 @@ export default function RideCard({
     stats?.startCoords ? 
       getTimezoneFromCoordinates(stats.startCoords.lat, stats.startCoords.lng) :
       'UTC';
-  
-  // Debug timezone conversion
-  console.log('Timezone debug:', {
-    rideDateTime: ride.dateTime,
-    timezone,
-    userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    meetupCoords: ride.meetupCoords
-  });
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
