@@ -39,7 +39,8 @@ function Router() {
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />
       <Route path="/ride/:id" component={RideDetail} />
-      <Route path="/ride/:id/my-performance" component={MyPerformance} />
+      <Route path="/my-performance/:id" component={MyPerformance} />
+      <Route path="/my-performance/solo/:id" component={MyPerformance} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -362,14 +362,28 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
 
           <div className="flex items-center gap-2">
             {isGroup && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/ride/${activity.id}`);
-                }}
-              >View Event Details</Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/my-performance/${activity.id}`);
+                  }}
+                  className="mr-2"
+                >
+                  <Activity className="w-3 h-3 mr-1" />
+                  View Performance Details
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/ride/${activity.id}`);
+                  }}
+                >View Event Details</Button>
+              </>
             )}
             {!isGroup && (
               <>
@@ -378,7 +392,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/my-performance?activityId=${activity.id}&type=solo`);
+                    navigate(`/my-performance/solo/${activity.id}`);
                   }}
                   className="mr-2"
                 >

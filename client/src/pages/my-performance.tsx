@@ -12,27 +12,25 @@ import { type Ride } from "@shared/schema";
 
 export default function MyPerformance() {
   const { id } = useParams<{ id: string }>();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const user = authManager.getUser();
 
-  // Get URL parameters to determine if this is a solo activity or group ride
-  const urlParams = new URLSearchParams(window.location.search);
-  const activityId = urlParams.get('activityId');
-  const type = urlParams.get('type');
+  // Determine if this is a solo activity based on URL path
+  const isSolo = location.includes('/my-performance/solo/');
 
   const { data: ride, isLoading: isLoadingRide } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
-    enabled: !!id && type !== 'solo',
+    enabled: !!id && !isSolo,
   });
 
   const { data: soloActivity, isLoading: isLoadingSolo } = useQuery({
-    queryKey: ['/api/solo-activities', activityId],
-    enabled: !!activityId && type === 'solo',
+    queryKey: ['/api/solo-activities', id],
+    enabled: !!id && isSolo,
   });
 
   const isLoading = isLoadingRide || isLoadingSolo;
-  const activity = type === 'solo' ? soloActivity : ride;
-  const userActivityData = type === 'solo' ? soloActivity : (ride as any)?.userActivityData;
+  const activity = isSolo ? soloActivity : ride;
+  const userActivityData = isSolo ? soloActivity : (ride as any)?.userActivityData;
   const { stats } = useGPXStats(userActivityData?.gpxFilePath);
 
   if (isLoading) {
@@ -88,14 +86,22 @@ export default function MyPerformance() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">My Performance</h1>
-            <p className="text-lg text-gray-600">{ride.name}</p>
+            <p className="text-lg text-gray-600">{activity.name}</p>
             <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                {ride.rideType}
-              </Badge>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                {ride.surfaceType}
-              </Badge>
+              {isSolo ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  {activity.activityType || 'cycling'}
+                </Badge>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    {activity.rideType}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {activity.surfaceType}
+                  </Badge>
+                </>
+              )}
               <Badge variant="default" className="bg-green-600 text-white">
                 Completed
               </Badge>
@@ -129,14 +135,16 @@ export default function MyPerformance() {
                 interactive={true}
                 showFullscreen={true}
               />
-              <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-green-800">
-                  Route Match: {userActivityData.routeMatchPercentage}%
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  Your route closely matched the planned ride route
-                </p>
-              </div>
+              {!isSolo && userActivityData.routeMatchPercentage && (
+                <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                  <p className="text-sm font-medium text-green-800">
+                    Route Match: {userActivityData.routeMatchPercentage}%
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Your route closely matched the planned ride route
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
