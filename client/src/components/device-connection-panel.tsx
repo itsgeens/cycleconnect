@@ -61,7 +61,7 @@ export default function DeviceConnectionPanel({
   // Mutation to save device connection
   const saveDeviceMutation = useMutation({
     mutationFn: (device: DeviceConnection) => 
-      apiRequest('POST', '/api/devices', device),
+      apiRequest('/api/devices', { method: 'POST', data: device }),
     onSuccess: () => {
       toast({
         title: "Device saved",

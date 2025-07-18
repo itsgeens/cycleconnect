@@ -49,7 +49,7 @@ export default function Home() {
   });
 
   const joinRideMutation = useMutation({
-    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/join`),
+    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/join`, { method: 'POST' }),
     onSuccess: (_, rideId) => {
       toast({
         title: "Successfully joined the ride!",
@@ -67,7 +67,7 @@ export default function Home() {
   });
 
   const leaveRideMutation = useMutation({
-    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/leave`),
+    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/leave`, { method: 'POST' }),
     onSuccess: (_, rideId) => {
       toast({
         title: "Left the ride",
@@ -96,7 +96,7 @@ export default function Home() {
   });
 
   const followMutation = useMutation({
-    mutationFn: (userId: number) => apiRequest('POST', `/api/users/${userId}/follow`),
+    mutationFn: (userId: number) => apiRequest(`/api/users/${userId}/follow`, { method: 'POST' }),
     onSuccess: () => {
       toast({
         title: "Followed user",
@@ -115,7 +115,7 @@ export default function Home() {
   });
 
   const unfollowMutation = useMutation({
-    mutationFn: (userId: number) => apiRequest('POST', `/api/users/${userId}/unfollow`),
+    mutationFn: (userId: number) => apiRequest(`/api/users/${userId}/unfollow`, { method: 'POST' }),
     onSuccess: () => {
       toast({
         title: "Unfollowed user",

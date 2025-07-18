@@ -28,7 +28,7 @@ export default function MyRides() {
   });
 
   const leaveRideMutation = useMutation({
-    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/leave`),
+    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/leave`, { method: 'POST' }),
     onSuccess: () => {
       toast({
         title: "Left the ride",
