@@ -172,14 +172,16 @@ export default function RideDetail() {
 
   const isOwner = user?.id === ride.organizerId;
   const isParticipant = ride.participants?.some(p => p.id === user?.id);
-  const rideDate = new Date(ride.dateTime);
+  const rideDateTime = new Date(ride.dateTime);
   const now = new Date();
-  const canComplete = isOwner && !ride.isCompleted && rideDate < now;
+  const hasRidePassed = rideDateTime.getTime() < now.getTime();
+  const canComplete = isOwner && !ride.isCompleted && hasRidePassed;
   
-  // Debug logging for date comparison
-  console.log('Date comparison debug:', {
-    rideDate: rideDate.toISOString(),
+  // Debug logging for datetime comparison
+  console.log('DateTime comparison debug:', {
+    rideDateTime: rideDateTime.toISOString(),
     now: now.toISOString(),
+    hasRidePassed,
     isOwner,
     isCompleted: ride.isCompleted,
     canComplete
