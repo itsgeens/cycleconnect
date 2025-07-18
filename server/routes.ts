@@ -518,6 +518,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.userId!;
       const activities = await storage.getUserCompletedActivities(userId);
+      
+      // Prevent caching to ensure fresh data
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
       res.json(activities);
     } catch (error) {
       console.error("Get completed activities error:", error);

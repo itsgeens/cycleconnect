@@ -142,11 +142,13 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
 
   // Debug log to see if userActivityData is being populated
   if (isGroup && activity.id === 9) {
-    console.log('Activity data for ride 9:', {
+    console.log('Activity data for ride 9 (FRESH):', {
       activityId: activity.id,
       userActivityData: activity.userActivityData,
       distance: activity.distance,
       hasUserData: !!activity.userActivityData,
+      userDistance: activity.userActivityData?.distance,
+      userMovingTime: activity.userActivityData?.movingTime,
       fullActivity: activity
     });
   }

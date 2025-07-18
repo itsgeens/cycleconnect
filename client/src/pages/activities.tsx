@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
@@ -36,6 +36,12 @@ export default function Activities() {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
+
+  // Clear cache and force fresh data fetch
+  const invalidateActivities = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/completed-activities"] });
+    queryClient.removeQueries({ queryKey: ["/api/completed-activities"] });
+  };
 
   const leaveRideMutation = useMutation({
     mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/leave`, { method: 'POST' }),
