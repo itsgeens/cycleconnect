@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,9 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Wifi
+  Wifi,
+  Upload,
+  FileText
 } from "lucide-react";
 import { deviceManager, DeviceConnectionManager } from "@/lib/device-connection";
 import { DeviceConnection } from "@shared/device-schema";
@@ -35,6 +37,8 @@ export default function DeviceConnectionPanel({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedDevices, setConnectedDevices] = useState<DeviceConnection[]>([]);
   const [webBluetoothSupported, setWebBluetoothSupported] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Check Web Bluetooth support on mount
@@ -122,6 +126,57 @@ export default function DeviceConnectionPanel({
     }
   };
 
+  // Handle manual GPX upload
+  const handleGpxUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.gpx')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a GPX file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('gpx', file);
+      formData.append('deviceName', 'Manual Upload');
+      formData.append('deviceType', 'cycling_computer');
+
+      const response = await fetch('/api/upload-activity', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload GPX file');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "GPX uploaded successfully",
+        description: `Activity uploaded and ready for route matching. ${result.matches ? `Found ${result.matches} potential ride matches.` : ''}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload GPX file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Get device icon
   const getDeviceIcon = (deviceType: string) => {
     switch (deviceType) {
@@ -196,53 +251,135 @@ export default function DeviceConnectionPanel({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Connection Button */}
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={handleConnectDevice}
-            disabled={isConnecting}
-            size="sm"
-          >
-            {isConnecting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Bluetooth className="w-4 h-4 mr-2" />
-                Connect Device
-              </>
-            )}
-          </Button>
-          
-          <Badge variant="secondary" className="text-xs">
-            {connectedDevices.length} active
-          </Badge>
+        {/* Connection Options */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={handleConnectDevice}
+              disabled={isConnecting}
+              size="sm"
+            >
+              {isConnecting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Bluetooth className="w-4 h-4 mr-2" />
+                  Connect Device
+                </>
+              )}
+            </Button>
+            
+            <Badge variant="secondary" className="text-xs">
+              {connectedDevices.length} active
+            </Badge>
+          </div>
+
+          {/* Alternative Connection Method */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <h4 className="font-medium text-sm mb-2">Can't Connect Your Garmin Device?</h4>
+            <p className="text-xs text-muted-foreground mb-2">
+              Most Garmin Edge devices can't connect directly to laptops via Bluetooth. Here are your options:
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <div className="w-4 h-4 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center mt-0.5">1</div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium">Manual GPX Upload</p>
+                  <p className="text-xs text-muted-foreground mb-2">After your ride, upload your GPX file manually for automatic completion matching</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".gpx"
+                      onChange={handleGpxUpload}
+                      ref={fileInputRef}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="text-xs h-7"
+                    >
+                      {isUploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3 mr-1" />
+                          Upload GPX
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-4 h-4 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center mt-0.5">2</div>
+                <div>
+                  <p className="text-xs font-medium">Smartphone Bridge</p>
+                  <p className="text-xs text-muted-foreground">Use your phone's Garmin Connect app to sync, then upload from there</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-4 h-4 rounded-full bg-amber-400 text-white text-xs flex items-center justify-center mt-0.5">3</div>
+                <div>
+                  <p className="text-xs font-medium">ANT+ Dongle (Coming Soon)</p>
+                  <p className="text-xs text-muted-foreground">Future support for ANT+ USB dongles for direct connection</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Connection Instructions */}
-        <div className="bg-blue-50 p-3 rounded-lg">
-          <h4 className="font-medium text-sm mb-2">Connection Tips</h4>
-          <ul className="text-xs space-y-1 text-muted-foreground">
-            <li>• Make sure your device is in pairing/discoverable mode</li>
-            <li>• Keep your device close to your computer (within 3 feet)</li>
-            <li>• For Garmin devices, go to Settings → System → Bluetooth</li>
-            <li>• For Wahoo devices, press and hold the power button</li>
-          </ul>
+        {/* Connection Methods */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Direct Bluetooth Connection */}
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+              <Bluetooth className="w-4 h-4" />
+              Direct Connection
+            </h4>
+            <ul className="text-xs space-y-1 text-muted-foreground">
+              <li>• Smartphones and some smartwatches</li>
+              <li>• Newer Wahoo devices</li>
+              <li>• Some Garmin watches (Fenix, Forerunner)</li>
+              <li>• Make device discoverable first</li>
+            </ul>
+          </div>
+
+          {/* Alternative Methods */}
+          <div className="bg-orange-50 p-3 rounded-lg">
+            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+              <Smartphone className="w-4 h-4" />
+              Alternative Methods
+            </h4>
+            <ul className="text-xs space-y-1 text-muted-foreground">
+              <li>• Upload GPX files manually</li>
+              <li>• Use Garmin Connect mobile app</li>
+              <li>• Connect via smartphone bridge</li>
+              <li>• ANT+ USB dongle (future support)</li>
+            </ul>
+          </div>
         </div>
 
-        {/* Bluetooth Permission Instructions */}
+        {/* Device Compatibility Guide */}
         <Alert>
           <AlertTriangle className="w-4 h-4" />
           <AlertDescription>
-            <strong>Bluetooth Permission Required</strong>
+            <strong>Device Compatibility</strong>
             <div className="mt-2 space-y-1 text-xs">
-              <p><strong>Chrome/Edge:</strong> Click the lock icon in the address bar → Site settings → Bluetooth → Allow</p>
-              <p><strong>Or:</strong> Go to Settings → Privacy & Security → Site Settings → Bluetooth → Allow this site</p>
+              <p><strong>✅ Direct Bluetooth:</strong> Smartphones, some smartwatches, newer Wahoo devices</p>
+              <p><strong>❌ Limited Support:</strong> Most Garmin Edge cycling computers (use manual GPX upload instead)</p>
+              <p><strong>Browser:</strong> Chrome, Edge, or Opera required (Firefox/Safari not supported)</p>
               {!isSecureConnection && (
                 <p className="text-red-600 font-medium">
-                  <strong>⚠️ Secure connection required:</strong> Web Bluetooth only works with HTTPS. Make sure your URL starts with https://
+                  <strong>⚠️ Secure connection required:</strong> Web Bluetooth only works with HTTPS
                 </p>
               )}
             </div>
