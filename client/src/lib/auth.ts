@@ -94,6 +94,10 @@ class AuthManager {
   public getAuthHeaders() {
     return this.state.sessionId ? { Authorization: `Bearer ${this.state.sessionId}` } : {};
   }
+
+  public getUser() {
+    return this.state.user;
+  }
 }
 
 export const authManager = new AuthManager();
