@@ -126,6 +126,30 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
     enabled: isGroup && showParticipantsModal,
   });
 
+  // Helper function to safely parse date
+  const formatCompletedDate = (date: string | Date) => {
+    try {
+      const parsedDate = typeof date === 'string' ? new Date(date) : date;
+      if (isNaN(parsedDate.getTime())) {
+        return 'Unknown date';
+      }
+      return format(parsedDate, 'MMM dd, yyyy');
+    } catch (error) {
+      console.error('Date parsing error:', error);
+      return 'Unknown date';
+    }
+  };
+
+  // Debug log to see if userActivityData is being populated
+  if (isGroup && activity.id === 9) {
+    console.log('Activity data for ride 9:', {
+      activityId: activity.id,
+      userActivityData: activity.userActivityData,
+      distance: activity.distance,
+      hasUserData: !!activity.userActivityData
+    });
+  }
+
   return (
     <Card 
       className={`w-full transition-all duration-200 ${
@@ -173,7 +197,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
               <Calendar className="w-4 h-4" />
               <span>
-                Completed on {format(new Date(completedDate), 'MMM dd, yyyy')}
+                Completed on {formatCompletedDate(completedDate)}
               </span>
             </div>
 
