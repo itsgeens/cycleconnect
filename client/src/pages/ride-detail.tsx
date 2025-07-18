@@ -243,7 +243,16 @@ export default function RideDetail() {
                   </DialogContent>
                 </Dialog>
               )}
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  toast({
+                    title: "Edit functionality",
+                    description: "Ride editing feature coming soon!",
+                  });
+                }}
+              >
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
