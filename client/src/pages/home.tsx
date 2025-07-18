@@ -31,7 +31,7 @@ export default function Home() {
   });
 
   const joinRideMutation = useMutation({
-    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/join`, { method: 'POST' }),
+    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/join`),
     onSuccess: (_, rideId) => {
       toast({
         title: "Successfully joined the ride!",
@@ -49,7 +49,7 @@ export default function Home() {
   });
 
   const leaveRideMutation = useMutation({
-    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/leave`, { method: 'POST' }),
+    mutationFn: (rideId: number) => apiRequest('POST', `/api/rides/${rideId}/leave`),
     onSuccess: (_, rideId) => {
       toast({
         title: "Left the ride",

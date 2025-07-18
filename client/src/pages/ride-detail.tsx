@@ -29,7 +29,7 @@ export default function RideDetail() {
   const { stats } = useGPXStats(ride?.gpxFilePath ? `/uploads/${ride.gpxFilePath}` : undefined);
 
   const joinRideMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/rides/${id}/join`, { method: 'POST' }),
+    mutationFn: () => apiRequest('POST', `/api/rides/${id}/join`),
     onSuccess: () => {
       toast({
         title: "Successfully joined the ride!",
@@ -47,7 +47,7 @@ export default function RideDetail() {
   });
 
   const leaveRideMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/rides/${id}/leave`, { method: 'POST' }),
+    mutationFn: () => apiRequest('POST', `/api/rides/${id}/leave`),
     onSuccess: () => {
       toast({
         title: "Left the ride",
@@ -65,7 +65,7 @@ export default function RideDetail() {
   });
 
   const deleteRideMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/rides/${id}`, { method: 'DELETE' }),
+    mutationFn: () => apiRequest('DELETE', `/api/rides/${id}`),
     onSuccess: () => {
       toast({
         title: "Ride deleted",
