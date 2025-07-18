@@ -71,6 +71,9 @@ export default function RideDetail() {
         title: "Ride deleted",
         description: "The ride has been successfully deleted.",
       });
+      // Invalidate all rides queries to refresh the home page
+      queryClient.invalidateQueries({ queryKey: ['/api/rides'] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
       navigate('/');
     },
     onError: (error: any) => {

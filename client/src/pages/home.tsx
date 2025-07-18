@@ -37,7 +37,7 @@ export default function Home() {
         title: "Successfully joined the ride!",
         description: "You'll receive updates about this ride.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
     },
     onError: (error: any) => {
       toast({
@@ -55,7 +55,7 @@ export default function Home() {
         title: "Left the ride",
         description: "You're no longer part of this ride.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
     },
     onError: (error: any) => {
       toast({
