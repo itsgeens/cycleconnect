@@ -28,8 +28,11 @@ export default function RideCard({
 }: RideCardProps) {
   const { stats } = useGPXStats(ride.gpxFilePath);
   
-  const isParticipant = ride.participants?.some(p => p.id === currentUserId);
-  const isOwner = ride.organizerId === currentUserId;
+  // Check if user is a participant - handle both full participants array and boolean flags
+  const isParticipant = ride.participants?.some(p => p.id === currentUserId) || 
+                       (ride as any).isParticipant || 
+                       false;
+  const isOwner = ride.organizerId === currentUserId || (ride as any).isOrganizer || false;
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
