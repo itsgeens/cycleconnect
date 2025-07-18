@@ -6,6 +6,7 @@ import GPXMapPreview from "@/components/gpx-map-preview";
 import { Calendar, Route, Mountain, Users, MapPin, Cloud, CloudRain, Sun } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
+import { getTimezoneFromCoordinates, formatDateInTimezone } from "@/utils/timezone";
 
 interface RideCardProps {
   ride: Ride;
@@ -37,6 +38,13 @@ export default function RideCard({
                        (ride as any).isParticipant || 
                        false;
   const isOwner = ride.organizerId === currentUserId || (ride as any).isOrganizer || false;
+
+  // Get timezone from meetup coordinates or GPX data
+  const timezone = ride.meetupCoords ? 
+    getTimezoneFromCoordinates(ride.meetupCoords.lat, ride.meetupCoords.lng) : 
+    stats?.startCoords ? 
+      getTimezoneFromCoordinates(stats.startCoords.lat, stats.startCoords.lng) :
+      'UTC';
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -99,11 +107,16 @@ export default function RideCard({
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="w-4 h-4 text-gray-500" />
             <span className="font-medium">
-              {ride.dateTime ? format(new Date(ride.dateTime), 'MMM d, yyyy') : 'Date TBD'}
+              {ride.dateTime ? formatDateInTimezone(ride.dateTime, timezone, 'MMM d, yyyy') : 'Date TBD'}
             </span>
             <span className="text-gray-600">
-              {ride.dateTime ? format(new Date(ride.dateTime), 'h:mm a') : ''}
+              {ride.dateTime ? formatDateInTimezone(ride.dateTime, timezone, 'h:mm a') : ''}
             </span>
+            {ride.dateTime && timezone !== 'UTC' && (
+              <span className="text-xs text-gray-500 px-1.5 py-0.5 bg-gray-100 rounded">
+                {timezone.includes('/') ? timezone.split('/')[1].replace('_', ' ') : timezone}
+              </span>
+            )}
           </div>
 
           {/* Distance */}

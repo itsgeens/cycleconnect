@@ -4,6 +4,8 @@ export interface GPXStats {
   distance: number;
   elevationGain: number;
   coordinates: [number, number][];
+  startCoords?: { lat: number; lng: number };
+  endCoords?: { lat: number; lng: number };
 }
 
 export function useGPXStats(gpxUrl?: string) {
@@ -85,7 +87,9 @@ function parseGPXData(gpxContent: string): GPXStats {
   return {
     distance: Math.round(totalDistance * 100) / 100, // Round to 2 decimal places
     elevationGain: Math.round(elevationGain),
-    coordinates
+    coordinates,
+    startCoords: coordinates.length > 0 ? { lat: coordinates[0][0], lng: coordinates[0][1] } : undefined,
+    endCoords: coordinates.length > 0 ? { lat: coordinates[coordinates.length - 1][0], lng: coordinates[coordinates.length - 1][1] } : undefined
   };
 }
 
