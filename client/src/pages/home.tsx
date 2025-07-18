@@ -1,16 +1,24 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import RideForm from "@/components/ride-form";
 import RideFilters from "@/components/ride-filters";
 import RideCard from "@/components/ride-card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { authManager } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, MapPin, Activity } from "lucide-react";
 
 export default function Home() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [filters, setFilters] = useState({});
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const user = authManager.getState().user;
 
   const { data: rides, isLoading } = useQuery({
     queryKey: ["/api/rides", filters],
@@ -19,6 +27,42 @@ export default function Home() {
       const response = await fetch(`/api/rides?${params}`);
       if (!response.ok) throw new Error("Failed to fetch rides");
       return response.json();
+    },
+  });
+
+  const joinRideMutation = useMutation({
+    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/join`, { method: 'POST' }),
+    onSuccess: (_, rideId) => {
+      toast({
+        title: "Successfully joined the ride!",
+        description: "You'll receive updates about this ride.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to join ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const leaveRideMutation = useMutation({
+    mutationFn: (rideId: number) => apiRequest(`/api/rides/${rideId}/leave`, { method: 'POST' }),
+    onSuccess: (_, rideId) => {
+      toast({
+        title: "Left the ride",
+        description: "You're no longer part of this ride.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to leave ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -128,7 +172,16 @@ export default function Home() {
               ))
             ) : rides?.length > 0 ? (
               rides.map((ride: any) => (
-                <RideCard key={ride.id} ride={ride} />
+                <RideCard 
+                  key={ride.id} 
+                  ride={ride} 
+                  onJoin={(rideId) => joinRideMutation.mutate(rideId)}
+                  onLeave={(rideId) => leaveRideMutation.mutate(rideId)}
+                  onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                  isJoining={joinRideMutation.isPending}
+                  isLeaving={leaveRideMutation.isPending}
+                  currentUserId={user?.id}
+                />
               ))
             ) : (
               <div className="col-span-full text-center py-12">

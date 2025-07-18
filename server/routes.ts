@@ -269,6 +269,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/rides/:id", requireAuth, async (req, res) => {
+    try {
+      const rideId = parseInt(req.params.id);
+      const ride = await storage.getRide(rideId);
+      
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+      
+      if (ride.organizerId !== req.userId!) {
+        return res.status(403).json({ message: "Only the organizer can delete this ride" });
+      }
+      
+      await storage.deleteRide(rideId);
+      res.json({ message: "Ride deleted successfully" });
+    } catch (error) {
+      console.error("Delete ride error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

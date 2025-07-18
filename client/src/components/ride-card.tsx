@@ -1,146 +1,148 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { authManager } from "../lib/auth";
-import { useToast } from "@/hooks/use-toast";
-import { Calendar, MapPin, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useGPXStats } from "@/hooks/use-gpx-stats";
+import GPXMapPreview from "@/components/gpx-map-preview";
+import { Calendar, Route, Mountain, Users, MapPin } from "lucide-react";
 import { format } from "date-fns";
+import { type Ride } from "@shared/schema";
 
 interface RideCardProps {
-  ride: {
-    id: number;
-    name: string;
-    description: string;
-    dateTime: string;
-    rideType: string;
-    surfaceType: string;
-    meetupLocation: string;
-    organizerName: string;
-    participantCount: number;
-  };
+  ride: Ride;
+  onJoin: (rideId: number) => void;
+  onLeave: (rideId: number) => void;
+  onCardClick: (rideId: number) => void;
+  isJoining?: boolean;
+  isLeaving?: boolean;
+  currentUserId?: number;
 }
 
-export default function RideCard({ ride }: RideCardProps) {
-  const [isJoined, setIsJoined] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+export default function RideCard({ 
+  ride, 
+  onJoin, 
+  onLeave, 
+  onCardClick,
+  isJoining = false, 
+  isLeaving = false,
+  currentUserId 
+}: RideCardProps) {
+  const { stats } = useGPXStats(ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined);
+  
+  const isParticipant = ride.participants?.some(p => p.id === currentUserId);
+  const isOwner = ride.organizerId === currentUserId;
 
-  const joinRideMutation = useMutation({
-    mutationFn: async (rideId: number) => {
-      const headers = authManager.getAuthHeaders();
-      const response = await fetch(`/api/rides/${rideId}/join`, {
-        method: "POST",
-        headers,
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to join ride");
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      setIsJoined(true);
-      toast({
-        title: "Joined ride!",
-        description: "You've successfully joined this ride.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/rides"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to join ride",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleJoinRide = () => {
-    joinRideMutation.mutate(ride.id);
+  const handleJoinClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onJoin(ride.id);
   };
 
-  const getRideTypeColor = (type: string) => {
-    switch (type) {
-      case "coffee":
-        return "bg-amber-100 text-amber-800";
-      case "casual":
-        return "bg-cycling-blue text-white";
-      case "threshold":
-        return "bg-energy-red text-white";
-      case "zone2":
-        return "bg-purple-100 text-purple-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getSurfaceTypeColor = (type: string) => {
-    switch (type) {
-      case "paved":
-        return "bg-nature-green text-white";
-      case "gravel":
-        return "bg-amber-600 text-white";
-      case "mixed":
-        return "bg-blue-600 text-white";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  const handleLeaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onLeave(ride.id);
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-shadow">
+    <Card 
+      className="hover:shadow-md transition-all duration-200 cursor-pointer group"
+      onClick={() => onCardClick(ride.id)}
+    >
       <div className="relative">
-        <div className="w-full h-48 bg-gradient-to-br from-cycling-blue to-blue-700"></div>
-        <div className="absolute top-4 left-4 flex space-x-2">
-          <Badge className={getRideTypeColor(ride.rideType)}>
-            {ride.rideType.charAt(0).toUpperCase() + ride.rideType.slice(1)}
+        {/* GPX Map Preview */}
+        <GPXMapPreview
+          gpxUrl={ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined}
+          className="h-48"
+          interactive={false}
+        />
+        
+        {/* Tags overlaid on top left */}
+        <div className="absolute top-2 left-2 flex gap-1">
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+            {ride.rideType}
           </Badge>
-          <Badge className={getSurfaceTypeColor(ride.surfaceType)}>
-            {ride.surfaceType.charAt(0).toUpperCase() + ride.surfaceType.slice(1)}
+          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+            {ride.surfaceType}
           </Badge>
         </div>
+
+        {/* Participant count overlaid on top right */}
+        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded px-2 py-1 flex items-center gap-1">
+          <Users className="w-3 h-3 text-gray-600" />
+          <span className="text-xs font-medium">{ride.participants?.length || 0}</span>
+        </div>
       </div>
-      
-      <CardContent className="p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-2">{ride.name}</h3>
-        <p className="text-gray-600 mb-4 line-clamp-2">
-          {ride.description || "Join us for this exciting ride!"}
-        </p>
-        
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center text-sm text-gray-600">
-            <Calendar className="w-4 h-4 mr-1" />
-            <span>{format(new Date(ride.dateTime), "EEE, MMM dd • h:mm a")}</span>
+
+      <CardContent className="p-4">
+        <div className="mb-3">
+          <h3 className="font-semibold text-lg mb-1 group-hover:text-cycling-blue transition-colors">
+            {ride.name}
+          </h3>
+          {ride.description && (
+            <p className="text-sm text-gray-600 line-clamp-2">
+              {ride.description}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2 mb-4">
+          {/* Date and Time */}
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <span className="font-medium">
+              {ride.date ? format(new Date(ride.date), 'MMM d, yyyy') : 'Date TBD'}
+            </span>
+            <span className="text-gray-600">
+              {ride.date ? format(new Date(ride.date), 'h:mm a') : ''}
+            </span>
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <MapPin className="w-4 h-4 mr-1" />
-            <span>{ride.meetupLocation}</span>
+
+          {/* Distance */}
+          {stats && (
+            <div className="flex items-center gap-2 text-sm">
+              <Route className="w-4 h-4 text-gray-500" />
+              <span className="font-medium">{stats.distance} km</span>
+            </div>
+          )}
+
+          {/* Elevation Gain */}
+          {stats && (
+            <div className="flex items-center gap-2 text-sm">
+              <Mountain className="w-4 h-4 text-gray-500" />
+              <span className="font-medium">{stats.elevationGain} m</span>
+            </div>
+          )}
+
+          {/* Location */}
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="w-4 h-4 text-gray-500" />
+            <span className="text-gray-600 truncate">{ride.meetupLocation}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Users className="w-4 h-4 mr-2 text-gray-600" />
-            <span className="text-sm text-gray-600">
-              {ride.participantCount} {ride.participantCount === 1 ? "participant" : "participants"}
-            </span>
+        {/* Join/Leave Button */}
+        {!isOwner && (
+          <div className="flex justify-end">
+            {isParticipant ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLeaveClick}
+                disabled={isLeaving}
+                className="text-sm"
+              >
+                {isLeaving ? 'Leaving...' : 'Leave Ride'}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleJoinClick}
+                disabled={isJoining}
+                className="text-sm"
+              >
+                {isJoining ? 'Joining...' : 'Join Ride'}
+              </Button>
+            )}
           </div>
-          <Button
-            onClick={handleJoinRide}
-            disabled={joinRideMutation.isPending || isJoined}
-            className={isJoined ? "bg-nature-green hover:bg-nature-green" : ""}
-          >
-            {joinRideMutation.isPending 
-              ? "Joining..." 
-              : isJoined 
-                ? "Joined!" 
-                : "Join Ride"}
-          </Button>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

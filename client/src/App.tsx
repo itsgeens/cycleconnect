@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Auth from "@/pages/auth";
+import RideDetail from "@/pages/ride-detail";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -24,6 +25,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/ride/:id" component={RideDetail} />
       <Route component={NotFound} />
     </Switch>
   );

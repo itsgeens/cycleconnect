@@ -146,6 +146,16 @@ export class DatabaseStorage implements IStorage {
       );
     return !!result;
   }
+
+  async deleteRide(rideId: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      // First delete all participants
+      await tx.delete(rideParticipants).where(eq(rideParticipants.rideId, rideId));
+      
+      // Then delete the ride
+      await tx.delete(rides).where(eq(rides.id, rideId));
+    });
+  }
 }
 
 export const storage = new DatabaseStorage();

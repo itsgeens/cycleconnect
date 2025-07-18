@@ -1,0 +1,295 @@
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { useGPXStats } from "@/hooks/use-gpx-stats";
+import { authManager } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
+import GPXMapPreview from "@/components/gpx-map-preview";
+import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User } from "lucide-react";
+import { format } from "date-fns";
+import { type Ride } from "@shared/schema";
+import { useState, useEffect } from "react";
+
+export default function RideDetail() {
+  const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const user = authManager.getUser();
+
+  const { data: ride, isLoading } = useQuery<Ride>({
+    queryKey: ['/api/rides', id],
+    enabled: !!id,
+  });
+
+  const { stats } = useGPXStats(ride?.gpxFile ? `/uploads/${ride.gpxFile}` : undefined);
+
+  const joinRideMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/rides/${id}/join`, { method: 'POST' }),
+    onSuccess: () => {
+      toast({
+        title: "Successfully joined the ride!",
+        description: "You'll receive updates about this ride.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to join ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const leaveRideMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/rides/${id}/leave`, { method: 'POST' }),
+    onSuccess: () => {
+      toast({
+        title: "Left the ride",
+        description: "You're no longer part of this ride.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to leave ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRideMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/rides/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toast({
+        title: "Ride deleted",
+        description: "The ride has been successfully deleted.",
+      });
+      navigate('/');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete ride",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-gray-200 rounded mb-6"></div>
+          <div className="space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ride) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-2xl font-bold mb-4">Ride not found</h1>
+        <Button onClick={() => navigate('/')} variant="outline">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to rides
+        </Button>
+      </div>
+    );
+  }
+
+  const isOwner = user?.id === ride.organizerId;
+  const isParticipant = ride.participants?.some(p => p.id === user?.id);
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <Button onClick={() => navigate('/')} variant="outline" className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to rides
+        </Button>
+        
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{ride.name}</h1>
+            <div className="flex gap-2 mb-4">
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                {ride.rideType}
+              </Badge>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {ride.surfaceType}
+              </Badge>
+            </div>
+          </div>
+          
+          {isOwner && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => deleteRideMutation.mutate()}
+                disabled={deleteRideMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Route className="w-5 h-5" />
+                Route Preview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GPXMapPreview
+                gpxUrl={ride.gpxFile ? `/uploads/${ride.gpxFile}` : undefined}
+                className="h-96"
+                interactive={true}
+                showFullscreen={true}
+              />
+            </CardContent>
+          </Card>
+
+          {ride.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-700">{ride.description}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ride Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="font-medium">
+                    {format(new Date(ride.date), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {format(new Date(ride.date), 'h:mm a')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <MapPin className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="font-medium">Meetup Location</p>
+                  <p className="text-sm text-gray-600">{ride.meetupLocation}</p>
+                </div>
+              </div>
+
+              {stats && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Route className="w-5 h-5 text-gray-500" />
+                    <div>
+                      <p className="font-medium">Distance</p>
+                      <p className="text-sm text-gray-600">{stats.distance} km</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Mountain className="w-5 h-5 text-gray-500" />
+                    <div>
+                      <p className="font-medium">Elevation Gain</p>
+                      <p className="text-sm text-gray-600">{stats.elevationGain} m</p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center gap-3">
+                <User className="w-5 h-5 text-gray-500" />
+                <div>
+                  <p className="font-medium">Organized by</p>
+                  <p className="text-sm text-gray-600">{ride.organizer?.name}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Participants ({ride.participants?.length || 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {ride.participants?.map((participant) => (
+                  <div key={participant.id} className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-cycling-blue rounded-full flex items-center justify-center text-white text-sm font-medium">
+                      {participant.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm">{participant.name}</span>
+                    {participant.id === ride.organizerId && (
+                      <Badge variant="secondary" className="text-xs">Organizer</Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Separator className="my-4" />
+
+              {!isOwner && (
+                <div>
+                  {isParticipant ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => leaveRideMutation.mutate()}
+                      disabled={leaveRideMutation.isPending}
+                    >
+                      Leave Ride
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={() => joinRideMutation.mutate()}
+                      disabled={joinRideMutation.isPending}
+                    >
+                      Join Ride
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
