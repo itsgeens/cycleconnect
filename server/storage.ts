@@ -835,10 +835,14 @@ export class DatabaseStorage implements IStorage {
 
         console.log(`User activity data for ride ${ride.id}:`, userActivityData);
 
-        return {
+        const result = {
           ...ride,
           userActivityData,
         };
+        
+        console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
+        
+        return result;
       })
     );
 
