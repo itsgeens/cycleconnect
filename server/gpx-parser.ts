@@ -3,9 +3,10 @@ import * as path from 'path';
 
 export interface GpxData {
   distance?: number; // in km
-  duration?: number; // in seconds
+  duration?: number; // total elapsed time in seconds
+  movingTime?: number; // active time (excluding stops) in seconds
   elevationGain?: number; // in meters
-  averageSpeed?: number; // in km/h
+  averageSpeed?: number; // in km/h (based on moving time)
   averageHeartRate?: number; // in bpm
   maxHeartRate?: number; // in bpm
   calories?: number;
@@ -111,16 +112,36 @@ export function parseGPXContent(gpxContent: string): GpxData {
     }
   }
 
-  // Calculate duration
+  // Calculate total elapsed time (duration)
   let duration: number | undefined;
   if (minTime && maxTime) {
     duration = Math.floor((maxTime.getTime() - minTime.getTime()) / 1000);
   }
 
-  // Calculate average speed
+  // Calculate moving time (active time, excluding stops)
+  let movingTime = 0;
+  const STOP_THRESHOLD = 0.5; // km/h - speed below this is considered stopped
+  
+  for (let i = 1; i < trackPoints.length; i++) {
+    const prevPoint = trackPoints[i - 1];
+    const currentPoint = trackPoints[i];
+    
+    if (prevPoint.time && currentPoint.time) {
+      const timeDiff = (currentPoint.time.getTime() - prevPoint.time.getTime()) / 1000; // seconds
+      const distance = calculateDistance(prevPoint.lat, prevPoint.lon, currentPoint.lat, currentPoint.lon);
+      const speed = distance / (timeDiff / 3600); // km/h
+      
+      // Only count time when moving above threshold speed
+      if (speed > STOP_THRESHOLD) {
+        movingTime += timeDiff;
+      }
+    }
+  }
+
+  // Calculate average speed based on moving time
   let averageSpeed: number | undefined;
-  if (duration && totalDistance > 0) {
-    averageSpeed = (totalDistance / (duration / 3600)); // km/h
+  if (movingTime > 0 && totalDistance > 0) {
+    averageSpeed = (totalDistance / (movingTime / 3600)); // km/h
   }
 
   // Calculate heart rate metrics
@@ -135,6 +156,7 @@ export function parseGPXContent(gpxContent: string): GpxData {
   return {
     distance: totalDistance > 0 ? totalDistance : undefined,
     duration,
+    movingTime: movingTime > 0 ? Math.floor(movingTime) : undefined,
     elevationGain: totalElevationGain > 0 ? totalElevationGain : undefined,
     averageSpeed,
     averageHeartRate,

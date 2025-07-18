@@ -111,10 +111,21 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-500" />
             <div>
-              <p className="text-xs text-gray-500">Duration</p>
-              <p className="font-medium">
-                {activity.duration ? formatDuration(activity.duration) : 'N/A'}
-              </p>
+              <p className="text-xs text-gray-500">Time</p>
+              <div className="font-medium">
+                {activity.movingTime ? (
+                  <div>
+                    <div className="text-green-600">Active: {formatDuration(activity.movingTime)}</div>
+                    {activity.duration && activity.duration !== activity.movingTime && (
+                      <div className="text-xs text-gray-500">Total: {formatDuration(activity.duration)}</div>
+                    )}
+                  </div>
+                ) : activity.duration ? (
+                  formatDuration(activity.duration)
+                ) : (
+                  'N/A'
+                )}
+              </div>
             </div>
           </div>
 

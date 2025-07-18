@@ -50,7 +50,8 @@ export const soloActivities = pgTable("solo_activities", {
   activityType: text("activity_type").notNull(), // cycling, running, etc.
   gpxFilePath: text("gpx_file_path").notNull(),
   distance: decimal("distance", { precision: 10, scale: 2 }), // in kilometers
-  duration: integer("duration"), // in seconds
+  duration: integer("duration"), // total elapsed time in seconds
+  movingTime: integer("moving_time"), // active time (excluding stops) in seconds
   elevationGain: decimal("elevation_gain", { precision: 10, scale: 2 }), // in meters
   averageSpeed: decimal("average_speed", { precision: 10, scale: 2 }), // km/h
   averageHeartRate: integer("average_heart_rate"), // bpm
@@ -155,6 +156,7 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
   gpxFilePath: true,
   distance: true,
   duration: true,
+  movingTime: true,
   elevationGain: true,
   averageSpeed: true,
   averageHeartRate: true,
