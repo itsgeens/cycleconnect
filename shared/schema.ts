@@ -172,9 +172,6 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
   completedAt: z.string().or(z.date()).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
 
-export type User = typeof users.$inferSelect;
-export type Ride = typeof rides.$inferSelect;
-export type RideParticipant = typeof rideParticipants.$inferSelect;
 export type SoloActivity = typeof soloActivities.$inferSelect;
 export type InsertSoloActivity = z.infer<typeof insertSoloActivitySchema>;
 
