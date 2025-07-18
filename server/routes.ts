@@ -550,24 +550,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse GPX file to extract activity data
       const gpxData = await parseGPXFile(file.path);
       
-      // Try to match with existing joined rides that are past due
+      // Try to match with existing joined rides within a reasonable time window
       const userRides = await storage.getUserRides(userId);
       const currentTime = new Date();
-      const pastDueRides = userRides.joined.filter(ride => {
+      const activityStartTime = new Date(gpxData.startTime);
+      
+      // Look for rides that are within 2 hours of the activity start time (before or after)
+      const timeWindowHours = 2;
+      const timeWindowMs = timeWindowHours * 60 * 60 * 1000;
+      
+      const candidateRides = userRides.joined.filter(ride => {
         const rideDateTime = new Date(ride.dateTime);
-        return rideDateTime < currentTime && !ride.isCompleted;
+        const timeDiff = Math.abs(activityStartTime.getTime() - rideDateTime.getTime());
+        return timeDiff <= timeWindowMs && !ride.isCompleted;
       });
+      
+      // Debug: Log available rides for matching
+      console.log('Available rides for matching:', candidateRides.map(r => ({
+        id: r.id,
+        name: r.name,
+        dateTime: r.dateTime,
+        isCompleted: r.isCompleted
+      })));
+      
+      console.log('Activity start time:', gpxData.startTime);
+      console.log('Activity track points:', gpxData.trackPoints?.length || 0);
       
       let bestMatch = null;
       let bestMatchScore = 0;
       
       // Simple route matching logic (can be enhanced)
-      for (const ride of pastDueRides) {
+      for (const ride of candidateRides) {
         try {
           const rideGpxData = await parseGPXFile(ride.gpxFilePath);
           const matchScore = calculateRouteMatch(gpxData, rideGpxData);
           
-          if (matchScore > bestMatchScore && matchScore >= 0.85) {
+          console.log(`Ride ${ride.name} match score: ${matchScore}`);
+          
+          if (matchScore > bestMatchScore && matchScore >= 0.5) {
             bestMatch = ride;
             bestMatchScore = matchScore;
           }
@@ -576,7 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      if (bestMatch && bestMatchScore >= 0.85) {
+      if (bestMatch && bestMatchScore >= 0.5) {
         // Match found - complete the ride
         await storage.completeRide(bestMatch.id, userId);
         

@@ -209,14 +209,30 @@ export function calculateRouteMatch(gpxData1: GpxData, gpxData2: GpxData): numbe
   const startDistance = calculateDistance(startPoint1.lat, startPoint1.lon, startPoint2.lat, startPoint2.lon);
   const endDistance = calculateDistance(endPoint1.lat, endPoint1.lon, endPoint2.lat, endPoint2.lon);
   
-  // Points within 1km are considered matching
-  const startScore = startDistance < 1 ? 1 : Math.max(0, 1 - startDistance / 5);
-  const endScore = endDistance < 1 ? 1 : Math.max(0, 1 - endDistance / 5);
+  // Points within 1km are considered matching, but be more lenient for nearby routes
+  const startScore = startDistance < 1 ? 1 : Math.max(0, 1 - startDistance / 10);
+  const endScore = endDistance < 1 ? 1 : Math.max(0, 1 - endDistance / 10);
   
   const waypointScore = (startScore + endScore) / 2;
   
+  // For routes in the same general area (within 5km), boost the score
+  const sameAreaBonus = startDistance < 5 ? 0.2 : 0;
+  
   // Combined score (weighted average)
-  const totalScore = (distanceScore * 0.4) + (waypointScore * 0.6);
+  const totalScore = (distanceScore * 0.4) + (waypointScore * 0.6) + sameAreaBonus;
+  
+  console.log('Route matching debug:', {
+    distance1: distance1?.toFixed(0),
+    distance2: distance2?.toFixed(0),
+    distanceScore: distanceScore.toFixed(2),
+    startDistance: startDistance.toFixed(0) + 'm',
+    endDistance: endDistance.toFixed(0) + 'm',
+    startScore: startScore.toFixed(2),
+    endScore: endScore.toFixed(2),
+    waypointScore: waypointScore.toFixed(2),
+    sameAreaBonus: sameAreaBonus.toFixed(2),
+    totalScore: totalScore.toFixed(2)
+  });
   
   return Math.max(0, Math.min(1, totalScore));
 }
