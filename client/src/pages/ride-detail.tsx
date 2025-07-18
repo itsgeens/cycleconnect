@@ -25,10 +25,24 @@ export default function RideDetail() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
-  const { data: ride, isLoading } = useQuery<Ride>({
+  const { data: ride, isLoading, error } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
     enabled: !!id,
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache the data
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
+
+  // Debug logging
+  useEffect(() => {
+    if (ride) {
+      console.log('Ride data:', ride);
+    }
+    if (error) {
+      console.error('Ride query error:', error);
+    }
+  }, [ride, error]);
 
   const { stats } = useGPXStats(ride?.gpxFilePath);
 
