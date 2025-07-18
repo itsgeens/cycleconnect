@@ -56,7 +56,10 @@ export default function Home() {
         title: "Left the ride",
         description: "You're no longer part of this ride.",
       });
+      // Invalidate multiple related queries
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-rides"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-stats"] });
       setShowLeaveModal(false);
       setSelectedRide(null);
     },

@@ -26,10 +26,14 @@ export default function MyStats() {
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/my-stats", { timeframe }],
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache the data
   });
 
   const { data: completedRides, isLoading: ridesLoading } = useQuery({
     queryKey: ["/api/my-completed-rides", { limit: showAllRides ? "all" : "5" }],
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache the data
   });
 
   const timeframeOptions = [
