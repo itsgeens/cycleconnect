@@ -22,24 +22,27 @@ export class DeviceConnectionManager {
   }
 
   // Connect to a cycling computer or smartwatch
-  async connectToCyclingDevice(): Promise<DeviceConnection | null> {
+  async connectToCyclingDevice(): Promise<DeviceConnection> {
     if (!DeviceConnectionManager.isSupported()) {
       throw new Error('Web Bluetooth not supported in this browser');
     }
 
     try {
-      // Request device with cycling-specific services
+      // Request device with broader filter options for better compatibility
       const device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { services: [DeviceConnectionManager.CYCLING_SERVICES.CYCLING_SPEED_CADENCE] },
-          { services: [DeviceConnectionManager.CYCLING_SERVICES.CYCLING_POWER] },
-          { services: [DeviceConnectionManager.CYCLING_SERVICES.HEART_RATE] },
-        ],
+        acceptAllDevices: true,
         optionalServices: [
           DeviceConnectionManager.CYCLING_SERVICES.DEVICE_INFORMATION,
           DeviceConnectionManager.CYCLING_SERVICES.BATTERY_SERVICE,
+          DeviceConnectionManager.CYCLING_SERVICES.CYCLING_SPEED_CADENCE,
+          DeviceConnectionManager.CYCLING_SERVICES.CYCLING_POWER,
+          DeviceConnectionManager.CYCLING_SERVICES.HEART_RATE,
         ]
       });
+
+      if (!device) {
+        throw new Error('No device selected');
+      }
 
       // Connect to the device
       const server = await device.gatt?.connect();
@@ -51,9 +54,9 @@ export class DeviceConnectionManager {
       this.connectedDevices.set(device.id, device);
       this.activeConnections.set(device.id, server);
 
-      // Get device information
-      const deviceInfo = await this.getDeviceInformation(server);
-      const batteryLevel = await this.getBatteryLevel(server);
+      // Get device information (non-blocking)
+      const deviceInfo = await this.getDeviceInformation(server).catch(() => ({}));
+      const batteryLevel = await this.getBatteryLevel(server).catch(() => undefined);
 
       const connection: DeviceConnection = {
         deviceId: device.id,
@@ -70,7 +73,16 @@ export class DeviceConnectionManager {
 
     } catch (error) {
       console.error('Error connecting to device:', error);
-      return null;
+      if (error instanceof DOMException) {
+        if (error.name === 'NotFoundError') {
+          throw new Error('No compatible device found. Make sure your device is in pairing mode.');
+        } else if (error.name === 'SecurityError') {
+          throw new Error('Bluetooth access denied. Please enable Bluetooth permissions.');
+        } else if (error.name === 'NotSupportedError') {
+          throw new Error('Web Bluetooth not supported. Use Chrome, Edge, or Opera.');
+        }
+      }
+      throw error;
     }
   }
 

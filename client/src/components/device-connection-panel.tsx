@@ -78,19 +78,18 @@ export default function DeviceConnectionPanel({
     try {
       const device = await deviceManager.connectToCyclingDevice();
       
-      if (device) {
-        setConnectedDevices(prev => [...prev, device]);
-        onDeviceConnected?.(device);
-        
-        // Save device to database
-        saveDeviceMutation.mutate(device);
-        
-        toast({
-          title: "Device connected",
-          description: `Successfully connected to ${device.deviceName}`,
-        });
-      }
+      setConnectedDevices(prev => [...prev, device]);
+      onDeviceConnected?.(device);
+      
+      // Save device to database
+      saveDeviceMutation.mutate(device);
+      
+      toast({
+        title: "Device connected",
+        description: `Successfully connected to ${device.deviceName}`,
+      });
     } catch (error: any) {
+      console.error('Connection error:', error);
       toast({
         title: "Connection failed",
         description: error.message || "Failed to connect to device. Please try again.",
@@ -217,6 +216,17 @@ export default function DeviceConnectionPanel({
           <Badge variant="secondary" className="text-xs">
             {connectedDevices.length} active
           </Badge>
+        </div>
+
+        {/* Connection Instructions */}
+        <div className="bg-blue-50 p-3 rounded-lg">
+          <h4 className="font-medium text-sm mb-2">Connection Tips</h4>
+          <ul className="text-xs space-y-1 text-muted-foreground">
+            <li>• Make sure your device is in pairing/discoverable mode</li>
+            <li>• Keep your device close to your computer (within 3 feet)</li>
+            <li>• For Garmin devices, go to Settings → System → Bluetooth</li>
+            <li>• For Wahoo devices, press and hold the power button</li>
+          </ul>
         </div>
 
         <Separator />
