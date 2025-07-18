@@ -9,12 +9,14 @@ import { type Ride } from "@shared/schema";
 
 interface RideCardProps {
   ride: Ride;
-  onJoin: (rideId: number) => void;
-  onLeave: (rideId: number) => void;
-  onCardClick: (rideId: number) => void;
+  onJoin?: (rideId: number) => void;
+  onLeave?: (rideId: number) => void;
+  onCardClick?: (rideId: number) => void;
   isJoining?: boolean;
   isLeaving?: boolean;
   currentUserId?: number;
+  showLeaveButton?: boolean;
+  onLeaveClick?: () => void;
 }
 
 export default function RideCard({ 
@@ -24,7 +26,9 @@ export default function RideCard({
   onCardClick,
   isJoining = false, 
   isLeaving = false,
-  currentUserId 
+  currentUserId,
+  showLeaveButton = false,
+  onLeaveClick
 }: RideCardProps) {
   const { stats } = useGPXStats(ride.gpxFilePath);
   
@@ -36,18 +40,22 @@ export default function RideCard({
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onJoin(ride.id);
+    onJoin?.(ride.id);
   };
 
   const handleLeaveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onLeave(ride.id);
+    if (onLeaveClick) {
+      onLeaveClick();
+    } else {
+      onLeave?.(ride.id);
+    }
   };
 
   return (
     <Card 
       className="hover:shadow-md transition-all duration-200 cursor-pointer group"
-      onClick={() => onCardClick(ride.id)}
+      onClick={() => onCardClick?.(ride.id)}
     >
       <div className="relative">
         {/* GPX Map Preview */}

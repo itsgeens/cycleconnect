@@ -176,6 +176,8 @@ export default function Activities() {
                     ride={ride}
                     showLeaveButton={ride.organizerId !== user?.id}
                     onLeaveClick={() => handleLeaveClick(ride.id)}
+                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                    currentUserId={user?.id}
                   />
                 ))}
               </div>
