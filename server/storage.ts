@@ -365,10 +365,10 @@ export class DatabaseStorage implements IStorage {
         previousStartDate = new Date(0);
     }
 
-    // Get current period stats
+    // Get current period stats (count all rides in the period, not just completed ones)
     const currentStats = await db
       .select({
-        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} THEN ${rides.id} END)`,
+        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} AND ${rideParticipants.userId} = ${userId} THEN ${rides.id} END)`,
         ridesHosted: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} = ${userId} THEN ${rides.id} END)`,
         totalDistance: sql<number>`0`, // Will be calculated with GPX data
         totalElevation: sql<number>`0`, // Will be calculated with GPX data
@@ -377,9 +377,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
       .where(
         and(
-          sql`${rides.completedAt} >= ${startDate}`,
-          sql`${rides.completedAt} <= ${now}`,
-          eq(rides.isCompleted, true),
+          sql`${rides.createdAt} >= ${startDate}`,
+          sql`${rides.createdAt} <= ${now}`,
           sql`(${rides.organizerId} = ${userId} OR ${rideParticipants.userId} = ${userId})`
         )
       );
@@ -387,7 +386,7 @@ export class DatabaseStorage implements IStorage {
     // Get previous period stats for comparison
     const previousStats = await db
       .select({
-        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} THEN ${rides.id} END)`,
+        ridesJoined: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} != ${userId} AND ${rideParticipants.userId} = ${userId} THEN ${rides.id} END)`,
         ridesHosted: sql<number>`COUNT(DISTINCT CASE WHEN ${rides.organizerId} = ${userId} THEN ${rides.id} END)`,
         totalDistance: sql<number>`0`,
         totalElevation: sql<number>`0`,
@@ -396,9 +395,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
       .where(
         and(
-          sql`${rides.completedAt} >= ${previousStartDate}`,
-          sql`${rides.completedAt} < ${startDate}`,
-          eq(rides.isCompleted, true),
+          sql`${rides.createdAt} >= ${previousStartDate}`,
+          sql`${rides.createdAt} < ${startDate}`,
           sql`(${rides.organizerId} = ${userId} OR ${rideParticipants.userId} = ${userId})`
         )
       );
