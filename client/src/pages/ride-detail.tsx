@@ -24,6 +24,7 @@ export default function RideDetail() {
   const user = authManager.getUser();
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const { data: ride, isLoading, error } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
@@ -174,6 +175,15 @@ export default function RideDetail() {
   const rideDate = new Date(ride.dateTime);
   const now = new Date();
   const canComplete = isOwner && !ride.isCompleted && rideDate < now;
+  
+  // Debug logging for date comparison
+  console.log('Date comparison debug:', {
+    rideDate: rideDate.toISOString(),
+    now: now.toISOString(),
+    isOwner,
+    isCompleted: ride.isCompleted,
+    canComplete
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -235,15 +245,41 @@ export default function RideDetail() {
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => deleteRideMutation.mutate()}
-                disabled={deleteRideMutation.isPending}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
+              <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Ride</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete this ride? This action cannot be undone and will remove all associated data.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowDeleteModal(false)}
+                      disabled={deleteRideMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => {
+                        deleteRideMutation.mutate();
+                        setShowDeleteModal(false);
+                      }}
+                      disabled={deleteRideMutation.isPending}
+                    >
+                      {deleteRideMutation.isPending ? "Deleting..." : "Delete Ride"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>
