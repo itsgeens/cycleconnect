@@ -37,7 +37,12 @@ export default function Home() {
   const { data: riders, isLoading: isLoadingRiders } = useQuery({
     queryKey: ["/api/riders"],
     queryFn: async () => {
-      const response = await fetch("/api/riders");
+      const sessionId = localStorage.getItem("sessionId");
+      const response = await fetch("/api/riders", {
+        headers: {
+          "Authorization": `Bearer ${sessionId}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch riders");
       return response.json();
     },
