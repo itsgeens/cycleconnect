@@ -166,6 +166,7 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
 }).extend({
   activityType: z.enum(["cycling", "running", "walking", "other"]),
   deviceType: z.enum(["cycling_computer", "smartwatch", "phone", "manual"]).optional(),
+  completedAt: z.string().or(z.date()).transform((val) => typeof val === 'string' ? new Date(val) : val),
 });
 
 export type User = typeof users.$inferSelect;
