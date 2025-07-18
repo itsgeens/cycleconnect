@@ -175,16 +175,16 @@ export default function RideDetail() {
             </CardContent>
           </Card>
 
-          {ride.description && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-700">{ride.description}</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Description</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700">
+                {ride.description || 'No description provided for this ride.'}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -223,7 +223,9 @@ export default function RideDetail() {
                 <MapPin className="w-5 h-5 text-gray-500" />
                 <div>
                   <p className="font-medium">Meetup Location</p>
-                  <p className="text-sm text-gray-600">{ride.meetupLocation}</p>
+                  <p className="text-sm text-gray-600">
+                    {ride.meetupLocation || 'Meetup location TBD'}
+                  </p>
                 </div>
               </div>
 
