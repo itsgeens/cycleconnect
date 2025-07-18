@@ -107,4 +107,18 @@
   .focus\:border-cycling-blue:focus {
     border-color: var(--cycling-blue);
   }
+  
+  /* Drag and drop styles */
+  .drag-over {
+    border-color: var(--cycling-blue) !important;
+    background-color: #eff6ff !important;
+    transform: scale(1.02);
+    transition: all 0.2s ease-in-out;
+  }
+
+  .drag-active {
+    border-color: var(--cycling-blue) !important;
+    background-color: #dbeafe !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
 }

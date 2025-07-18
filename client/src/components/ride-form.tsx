@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authManager } from "../lib/auth";
-import { Upload, MapPin } from "lucide-react";
+import { Upload } from "lucide-react";
+import LocationPicker from "./location-picker";
 
 interface RideFormProps {
   onSuccess?: () => void;
@@ -86,18 +87,11 @@ export default function RideForm({ onSuccess }: RideFormProps) {
     createRideMutation.mutate(formDataToSend);
   };
 
-  const handleLocationClick = () => {
-    // Simulate location selection - in a real app, this would open a map
-    const locations = [
-      { name: "Central Park", lat: 40.7829, lng: -73.9654 },
-      { name: "Golden Gate Park", lat: 37.7694, lng: -122.4862 },
-      { name: "Millennium Park", lat: 41.8826, lng: -87.6226 },
-    ];
-    const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+  const handleLocationSelect = (location: string, coords: { lat: number; lng: number }) => {
     setFormData(prev => ({
       ...prev,
-      meetupLocation: randomLocation.name,
-      meetupCoords: { lat: randomLocation.lat, lng: randomLocation.lng },
+      meetupLocation: location,
+      meetupCoords: coords,
     }));
   };
 
@@ -164,7 +158,38 @@ export default function RideForm({ onSuccess }: RideFormProps) {
 
           <div>
             <Label htmlFor="gpxFile">Route GPX File *</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-cycling-blue transition-colors">
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-cycling-blue transition-all duration-200 ease-in-out"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over');
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files && files[0]) {
+                  const file = files[0];
+                  if (file.name.endsWith('.gpx') || file.type === 'application/gpx+xml') {
+                    setGpxFile(file);
+                    toast({
+                      title: "File uploaded successfully",
+                      description: `${file.name} has been selected for your ride.`,
+                    });
+                  } else {
+                    toast({
+                      title: "Invalid file type",
+                      description: "Please upload a GPX file.",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}
+            >
               <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <div className="text-sm text-gray-600">
                 <label htmlFor="gpxFile" className="cursor-pointer">
@@ -189,29 +214,10 @@ export default function RideForm({ onSuccess }: RideFormProps) {
 
           <div>
             <Label htmlFor="meetupLocation">Meetup Location *</Label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden">
-              <div 
-                className="h-64 bg-gray-200 relative cursor-pointer hover:bg-gray-300 transition-colors"
-                onClick={handleLocationClick}
-              >
-                <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                  <div className="text-white text-center">
-                    <MapPin className="mx-auto h-8 w-8 mb-2" />
-                    <p className="text-sm">
-                      {formData.meetupLocation ? `Selected: ${formData.meetupLocation}` : "Click to select meetup location"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 bg-white">
-                <Input
-                  value={formData.meetupLocation}
-                  onChange={(e) => setFormData(prev => ({ ...prev, meetupLocation: e.target.value }))}
-                  placeholder="Search for a location or click on the map"
-                  required
-                />
-              </div>
-            </div>
+            <LocationPicker
+              onLocationSelect={handleLocationSelect}
+              selectedLocation={formData.meetupLocation}
+            />
           </div>
 
           <div>
