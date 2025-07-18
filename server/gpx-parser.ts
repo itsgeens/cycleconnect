@@ -145,6 +145,12 @@ export function parseGPXContent(gpxContent: string): GpxData {
   let averageSpeed: number | undefined;
   if (movingTime > 0 && totalDistance > 0) {
     averageSpeed = (totalDistance / (movingTime / 3600)); // km/h
+  } else if (totalDistance > 0) {
+    // Fallback: estimate based on typical cycling speeds if no time data
+    // Use a reasonable estimate for recreational cycling (18-25 km/h)
+    averageSpeed = 20; // km/h default estimate
+    // Calculate estimated moving time based on this speed
+    movingTime = Math.floor((totalDistance / averageSpeed) * 3600); // seconds
   }
 
   // Calculate heart rate metrics
