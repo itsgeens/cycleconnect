@@ -290,26 +290,28 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
             </div>
           </div>
 
-          {((isGroup && activity.userActivityData?.averageHeartRate) || (!isGroup && activity.averageHeartRate)) && (
-            <div className="flex items-center gap-2">
-              <Heart className="w-4 h-4 text-red-500" />
-              <div>
-                <p className="text-xs text-gray-500">Heart Rate</p>
-                <p className="font-medium">
-                  Avg: {isGroup && activity.userActivityData?.averageHeartRate 
+          <div className="flex items-center gap-2">
+            <Heart className="w-4 h-4 text-red-500" />
+            <div>
+              <p className="text-xs text-gray-500">Heart Rate</p>
+              <p className="font-medium">
+                Avg: {(() => {
+                  const avgHR = isGroup && activity.userActivityData?.averageHeartRate 
                     ? activity.userActivityData.averageHeartRate 
-                    : activity.averageHeartRate} bpm
-                </p>
-                {((isGroup && activity.userActivityData?.maxHeartRate) || (!isGroup && activity.maxHeartRate)) && (
-                  <p className="text-xs text-gray-500">
-                    Max: {isGroup && activity.userActivityData?.maxHeartRate 
-                      ? activity.userActivityData.maxHeartRate 
-                      : activity.maxHeartRate} bpm
-                  </p>
-                )}
-              </div>
+                    : activity.averageHeartRate;
+                  return avgHR ? `${avgHR} bpm` : 'N/A';
+                })()}
+              </p>
+              <p className="text-xs text-gray-500">
+                Max: {(() => {
+                  const maxHR = isGroup && activity.userActivityData?.maxHeartRate 
+                    ? activity.userActivityData.maxHeartRate 
+                    : activity.maxHeartRate;
+                  return maxHR ? `${maxHR} bpm` : 'N/A';
+                })()}
+              </p>
             </div>
-          )}
+          </div>
 
           {(activity.deviceName || activity.userActivityData?.deviceId) && (
             <div className="flex items-center gap-2">
@@ -370,36 +372,50 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
               >View Event Details</Button>
             )}
             {!isGroup && (
-              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Activity</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete this activity? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDeleteActivity}
-                      className="bg-red-600 hover:bg-red-700"
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/my-performance?activityId=${activity.id}&type=solo`);
+                  }}
+                  className="mr-2"
+                >
+                  <Activity className="w-3 h-3 mr-1" />
+                  View Performance Details
+                </Button>
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
+                      <Trash2 className="w-3 h-3 mr-1" />
                       Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this activity? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteActivity}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
           </div>
         </div>

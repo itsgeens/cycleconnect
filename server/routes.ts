@@ -637,6 +637,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get solo activity by ID
+  app.get("/api/solo-activities/:id", requireAuth, async (req, res) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      const userId = req.userId!;
+      
+      const activity = await storage.getSoloActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: 'Activity not found' });
+      }
+
+      if (activity.userId !== userId) {
+        return res.status(403).json({ message: 'Not authorized to view this activity' });
+      }
+
+      res.json(activity);
+    } catch (error) {
+      console.error("Get solo activity error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // GPX upload route with activity matching
   app.post("/api/upload-activity", requireAuth, upload.single("gpx"), async (req, res) => {
     try {

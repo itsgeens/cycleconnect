@@ -15,12 +15,24 @@ export default function MyPerformance() {
   const [, navigate] = useLocation();
   const user = authManager.getUser();
 
-  const { data: ride, isLoading } = useQuery<Ride>({
+  // Get URL parameters to determine if this is a solo activity or group ride
+  const urlParams = new URLSearchParams(window.location.search);
+  const activityId = urlParams.get('activityId');
+  const type = urlParams.get('type');
+
+  const { data: ride, isLoading: isLoadingRide } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
-    enabled: !!id,
+    enabled: !!id && type !== 'solo',
   });
 
-  const userActivityData = (ride as any)?.userActivityData;
+  const { data: soloActivity, isLoading: isLoadingSolo } = useQuery({
+    queryKey: ['/api/solo-activities', activityId],
+    enabled: !!activityId && type === 'solo',
+  });
+
+  const isLoading = isLoadingRide || isLoadingSolo;
+  const activity = type === 'solo' ? soloActivity : ride;
+  const userActivityData = type === 'solo' ? soloActivity : (ride as any)?.userActivityData;
   const { stats } = useGPXStats(userActivityData?.gpxFilePath);
 
   if (isLoading) {
@@ -38,13 +50,13 @@ export default function MyPerformance() {
     );
   }
 
-  if (!ride || !userActivityData) {
+  if (!activity || !userActivityData) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <h1 className="text-2xl font-bold mb-4">Performance data not found</h1>
-        <Button onClick={() => navigate(`/ride/${id}`)} variant="outline">
+        <Button onClick={() => navigate('/activities')} variant="outline">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to ride details
+          Back to activities
         </Button>
       </div>
     );
@@ -68,9 +80,9 @@ export default function MyPerformance() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <Button onClick={() => navigate(`/ride/${id}`)} variant="outline" className="mb-4">
+        <Button onClick={() => navigate('/activities')} variant="outline" className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to ride details
+          Back to activities
         </Button>
         
         <div className="flex items-start justify-between mb-4">
