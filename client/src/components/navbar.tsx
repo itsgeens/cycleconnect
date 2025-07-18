@@ -1,0 +1,84 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { authManager } from "../lib/auth";
+import { Zap, User, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export default function Navbar() {
+  const [authState, setAuthState] = useState(authManager.getState());
+
+  useState(() => {
+    const unsubscribe = authManager.subscribe(setAuthState);
+    return unsubscribe;
+  });
+
+  const handleLogout = async () => {
+    await authManager.logout();
+  };
+
+  return (
+    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 flex items-center">
+              <div className="w-8 h-8 bg-cycling-blue rounded-full flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <span className="ml-2 text-xl font-bold text-gray-900">CycleConnect</span>
+            </div>
+          </div>
+          
+          <div className="hidden md:block">
+            <div className="ml-10 flex items-baseline space-x-8">
+              <a 
+                href="#discover" 
+                className="text-gray-900 hover:text-cycling-blue px-3 py-2 text-sm font-medium transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById("discover")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Discover Rides
+              </a>
+              <a 
+                href="#create" 
+                className="text-gray-500 hover:text-cycling-blue px-3 py-2 text-sm font-medium transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById("create-form")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Create Ride
+              </a>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {authState.user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center space-x-3">
+                    <User className="w-5 h-5" />
+                    <span className="text-sm font-medium">{authState.user.name}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}

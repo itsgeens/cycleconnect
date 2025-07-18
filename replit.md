@@ -1,0 +1,118 @@
+# CycleConnect - Cycling Community Platform
+
+## Overview
+
+CycleConnect is a full-stack web application that connects cyclists by allowing them to discover, organize, and participate in group rides. Built with modern web technologies, it provides a platform for cycling enthusiasts to share routes, organize events, and build community connections.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter for client-side routing
+- **Styling**: Tailwind CSS with shadcn/ui component library
+- **State Management**: TanStack Query for server state and custom auth manager for authentication
+- **Build Tool**: Vite for fast development and optimized builds
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js
+- **Language**: TypeScript with ES modules
+- **Database**: PostgreSQL with Drizzle ORM
+- **Session Management**: Simple in-memory session store with cleanup
+- **File Upload**: Multer for GPX file handling
+- **Authentication**: Custom session-based auth with bcrypt password hashing
+
+### Database Layer
+- **ORM**: Drizzle ORM with PostgreSQL adapter
+- **Connection**: Neon serverless database connection
+- **Migrations**: Drizzle Kit for schema management
+- **Schema**: Shared TypeScript schema definitions between client and server
+
+## Key Components
+
+### Authentication System
+- Session-based authentication with secure password hashing
+- Custom auth manager on frontend for state management
+- Protected routes and API endpoints
+- User registration and login with validation
+
+### Ride Management
+- Create rides with GPX file uploads for route data
+- Filter and search rides by various criteria (type, surface, distance, date)
+- Join/leave ride functionality
+- Participant management and tracking
+
+### UI Components
+- Comprehensive component library based on Radix UI primitives
+- Responsive design with mobile-first approach
+- Toast notifications for user feedback
+- Form handling with validation
+
+### File Upload System
+- GPX file upload with validation
+- File storage in server uploads directory
+- MIME type checking and size limits
+
+## Data Flow
+
+### User Authentication Flow
+1. User registers/logs in through auth forms
+2. Server validates credentials and creates session
+3. Session ID stored in localStorage and sent with requests
+4. Auth manager maintains client-side state
+5. Protected routes check authentication status
+
+### Ride Creation Flow
+1. User fills out ride form with details and GPX file
+2. Form data sent to server via multipart/form-data
+3. Server validates data, stores file, and creates database record
+4. Client receives confirmation and updates ride list
+
+### Ride Discovery Flow
+1. Client requests rides with optional filters
+2. Server queries database with filters and joins
+3. Results include ride details, organizer info, and participant counts
+4. Client displays rides in card format with filtering options
+
+## External Dependencies
+
+### Production Dependencies
+- **Database**: Neon serverless PostgreSQL
+- **UI Components**: Radix UI primitives for accessibility
+- **Styling**: Tailwind CSS for utility-first styling
+- **Form Handling**: React Hook Form with Zod validation
+- **Date Handling**: date-fns for date formatting and manipulation
+
+### Development Dependencies
+- **Build Tools**: Vite with React plugin
+- **TypeScript**: Full type safety across the stack
+- **Drizzle Kit**: Database schema management and migrations
+
+## Deployment Strategy
+
+### Development
+- Vite dev server for frontend with HMR
+- tsx for TypeScript execution in development
+- Concurrent client/server development setup
+- Replit-specific plugins for development environment
+
+### Production Build
+- Vite builds optimized client bundle
+- esbuild bundles server code for Node.js
+- Static files served from dist/public
+- Environment-based configuration
+
+### Database Management
+- Drizzle migrations for schema changes
+- Environment variable for database URL
+- Connection pooling with Neon serverless
+
+### File Storage
+- Local file storage for GPX uploads
+- Organized by upload timestamp and random suffix
+- MIME type validation and size limits
+
+The application follows a traditional full-stack architecture with clear separation between client and server concerns, unified by shared TypeScript types and schemas. The choice of modern tools like Vite, Drizzle, and TanStack Query provides excellent developer experience while maintaining production performance.
