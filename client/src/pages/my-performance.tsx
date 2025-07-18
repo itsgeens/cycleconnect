@@ -109,12 +109,31 @@ export default function MyPerformance() {
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-500">Completed on</p>
-            <p className="font-medium">
-              {format(new Date(userActivityData.completedAt || activity.completedAt || activity.createdAt), 'EEEE, MMMM d, yyyy')}
-            </p>
-            <p className="text-sm text-gray-600">
-              {format(new Date(userActivityData.completedAt || activity.completedAt || activity.createdAt), 'h:mm a')}
-            </p>
+            {(() => {
+              const completedDate = userActivityData.completedAt || activity.completedAt || activity.createdAt;
+              const date = completedDate ? new Date(completedDate) : new Date();
+              
+              // Check if date is valid
+              if (isNaN(date.getTime())) {
+                return (
+                  <>
+                    <p className="font-medium">Date not available</p>
+                    <p className="text-sm text-gray-600">-</p>
+                  </>
+                );
+              }
+              
+              return (
+                <>
+                  <p className="font-medium">
+                    {format(date, 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {format(date, 'h:mm a')}
+                  </p>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
