@@ -1,4 +1,4 @@
-import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch } from "@shared/schema";
+import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, soloActivities, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch, type SoloActivity, type InsertSoloActivity } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
@@ -70,6 +70,14 @@ export interface IStorage {
   createActivityMatch(match: InsertActivityMatch): Promise<ActivityMatch>;
   getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
   getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
+
+  // Solo activities operations
+  createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity>;
+  getUserSoloActivities(userId: number): Promise<SoloActivity[]>;
+  getUserCompletedActivities(userId: number): Promise<{
+    completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
+    soloActivities: SoloActivity[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -709,6 +717,69 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(activityMatches.matchedAt));
     
     return matches;
+  }
+
+  // Solo activities operations
+  async createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity> {
+    const [newActivity] = await db
+      .insert(soloActivities)
+      .values(activity)
+      .returning();
+    return newActivity;
+  }
+
+  async getUserSoloActivities(userId: number): Promise<SoloActivity[]> {
+    return await db
+      .select()
+      .from(soloActivities)
+      .where(eq(soloActivities.userId, userId))
+      .orderBy(desc(soloActivities.completedAt));
+  }
+
+  async getUserCompletedActivities(userId: number): Promise<{
+    completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
+    soloActivities: SoloActivity[];
+  }> {
+    // Get completed rides (both organized and joined)
+    const completedRides = await db
+      .select({
+        id: rides.id,
+        name: rides.name,
+        description: rides.description,
+        dateTime: rides.dateTime,
+        rideType: rides.rideType,
+        surfaceType: rides.surfaceType,
+        gpxFilePath: rides.gpxFilePath,
+        meetupLocation: rides.meetupLocation,
+        meetupCoords: rides.meetupCoords,
+        organizerId: rides.organizerId,
+        isCompleted: rides.isCompleted,
+        completedAt: rides.completedAt,
+        createdAt: rides.createdAt,
+        organizerName: users.name,
+        participantCount: sql<number>`cast(count(${rideParticipants.id}) as int)`,
+      })
+      .from(rides)
+      .leftJoin(users, eq(rides.organizerId, users.id))
+      .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
+      .where(
+        and(
+          eq(rides.isCompleted, true),
+          sql`(${rides.organizerId} = ${userId} OR ${rides.id} IN (
+            SELECT ride_id FROM ${rideParticipants} WHERE user_id = ${userId}
+          ))`
+        )
+      )
+      .groupBy(rides.id, users.name)
+      .orderBy(desc(rides.completedAt));
+
+    // Get solo activities
+    const soloActivities = await this.getUserSoloActivities(userId);
+
+    return {
+      completedRides: completedRides as any[],
+      soloActivities,
+    };
   }
 }
 

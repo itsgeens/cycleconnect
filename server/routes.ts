@@ -2,12 +2,13 @@ import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertRideSchema, rideFiltersSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertRideSchema, rideFiltersSchema, insertSoloActivitySchema } from "@shared/schema";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
+import { parseGPXFile, calculateRouteMatch } from "./gpx-parser";
 
 // Extend Request type to include userId
 declare global {
@@ -411,6 +412,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(following);
     } catch (error) {
       console.error("Get following error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Solo activities routes
+  app.get("/api/completed-activities", requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const activities = await storage.getUserCompletedActivities(userId);
+      res.json(activities);
+    } catch (error) {
+      console.error("Get completed activities error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/solo-activities", requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = insertSoloActivitySchema.parse(req.body);
+      
+      const activity = await storage.createSoloActivity({
+        ...validatedData,
+        userId,
+      });
+      
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Create solo activity error:", error);
+      if (error instanceof ZodError) {
+        res.status(400).json({ message: error.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // GPX upload route with activity matching
+  app.post("/api/upload-activity", requireAuth, upload.single("gpx"), async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({ message: "No GPX file provided" });
+      }
+
+      const { deviceName, deviceType } = req.body;
+      
+      // Parse GPX file to extract activity data
+      const gpxData = await parseGPXFile(file.path);
+      
+      // Try to match with existing joined rides
+      const userRides = await storage.getUserRides(userId);
+      const joinedRides = userRides.joined.filter(ride => !ride.isCompleted);
+      
+      let bestMatch = null;
+      let bestMatchScore = 0;
+      
+      // Simple route matching logic (can be enhanced)
+      for (const ride of joinedRides) {
+        try {
+          const rideGpxData = await parseGPXFile(ride.gpxFilePath);
+          const matchScore = calculateRouteMatch(gpxData, rideGpxData);
+          
+          if (matchScore > bestMatchScore && matchScore >= 0.85) {
+            bestMatch = ride;
+            bestMatchScore = matchScore;
+          }
+        } catch (error) {
+          console.warn(`Could not parse GPX for ride ${ride.id}:`, error);
+        }
+      }
+
+      if (bestMatch && bestMatchScore >= 0.85) {
+        // Match found - complete the ride
+        await storage.completeRide(bestMatch.id, userId);
+        
+        // Create activity match record
+        await storage.createActivityMatch({
+          rideId: bestMatch.id,
+          userId,
+          deviceId: deviceName || 'manual-upload',
+          routeMatchPercentage: bestMatchScore.toString(),
+          gpxFilePath: file.path,
+          distance: gpxData.distance,
+          duration: gpxData.duration,
+          elevationGain: gpxData.elevationGain,
+          averageSpeed: gpxData.averageSpeed,
+          averageHeartRate: gpxData.averageHeartRate,
+          maxHeartRate: gpxData.maxHeartRate,
+          calories: gpxData.calories,
+          completedAt: new Date(),
+        });
+        
+        res.json({
+          message: "Activity matched and ride completed!",
+          matchedRide: bestMatch,
+          matchScore: bestMatchScore,
+        });
+      } else {
+        // No match found - create solo activity
+        const activity = await storage.createSoloActivity({
+          name: `${deviceName || 'Manual'} Activity - ${new Date().toLocaleDateString()}`,
+          description: `Solo cycling activity uploaded from ${deviceName || 'device'}`,
+          activityType: 'cycling',
+          gpxFilePath: file.path,
+          distance: gpxData.distance?.toString(),
+          duration: gpxData.duration,
+          elevationGain: gpxData.elevationGain?.toString(),
+          averageSpeed: gpxData.averageSpeed?.toString(),
+          averageHeartRate: gpxData.averageHeartRate,
+          maxHeartRate: gpxData.maxHeartRate,
+          calories: gpxData.calories,
+          deviceName: deviceName || 'Manual Upload',
+          deviceType: deviceType || 'manual',
+          completedAt: new Date(),
+          userId,
+        });
+        
+        res.json({
+          message: "Solo activity created successfully",
+          activity,
+          matches: joinedRides.length,
+        });
+      }
+    } catch (error) {
+      console.error("Upload activity error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -42,11 +42,32 @@ export const follows = pgTable("follows", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const soloActivities = pgTable("solo_activities", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  activityType: text("activity_type").notNull(), // cycling, running, etc.
+  gpxFilePath: text("gpx_file_path").notNull(),
+  distance: decimal("distance", { precision: 10, scale: 2 }), // in kilometers
+  duration: integer("duration"), // in seconds
+  elevationGain: decimal("elevation_gain", { precision: 10, scale: 2 }), // in meters
+  averageSpeed: decimal("average_speed", { precision: 10, scale: 2 }), // km/h
+  averageHeartRate: integer("average_heart_rate"), // bpm
+  maxHeartRate: integer("max_heart_rate"), // bpm
+  calories: integer("calories"),
+  deviceName: text("device_name"),
+  deviceType: text("device_type"), // cycling_computer, smartwatch, phone
+  completedAt: timestamp("completed_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   organizedRides: many(rides),
   rideParticipations: many(rideParticipants),
   following: many(follows, { relationName: "follower" }),
   followers: many(follows, { relationName: "following" }),
+  soloActivities: many(soloActivities),
 }));
 
 export const ridesRelations = relations(rides, ({ one, many }) => ({
@@ -78,6 +99,13 @@ export const followsRelations = relations(follows, ({ one }) => ({
     fields: [follows.followingId],
     references: [users.id],
     relationName: "following",
+  }),
+}));
+
+export const soloActivitiesRelations = relations(soloActivities, ({ one }) => ({
+  user: one(users, {
+    fields: [soloActivities.userId],
+    references: [users.id],
   }),
 }));
 
@@ -119,6 +147,32 @@ export const rideFiltersSchema = z.object({
   userLat: z.number().optional(),
   userLng: z.number().optional(),
 });
+
+export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick({
+  name: true,
+  description: true,
+  activityType: true,
+  gpxFilePath: true,
+  distance: true,
+  duration: true,
+  elevationGain: true,
+  averageSpeed: true,
+  averageHeartRate: true,
+  maxHeartRate: true,
+  calories: true,
+  deviceName: true,
+  deviceType: true,
+  completedAt: true,
+}).extend({
+  activityType: z.enum(["cycling", "running", "walking", "other"]),
+  deviceType: z.enum(["cycling_computer", "smartwatch", "phone", "manual"]).optional(),
+});
+
+export type User = typeof users.$inferSelect;
+export type Ride = typeof rides.$inferSelect;
+export type RideParticipant = typeof rideParticipants.$inferSelect;
+export type SoloActivity = typeof soloActivities.$inferSelect;
+export type InsertSoloActivity = z.infer<typeof insertSoloActivitySchema>;
 
 // Device connections table
 export const deviceConnections = pgTable("device_connections", {

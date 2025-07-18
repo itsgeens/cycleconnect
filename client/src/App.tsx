@@ -8,7 +8,7 @@ import Home from "@/pages/home";
 import Auth from "@/pages/auth";
 import RideDetail from "@/pages/ride-detail";
 import CreateRide from "@/pages/create-ride";
-import MyRides from "@/pages/my-rides";
+import Activities from "@/pages/activities";
 import MyStats from "@/pages/my-stats";
 import FollowersPage from "@/pages/followers";
 import ManageDevices from "@/pages/manage-devices";
@@ -31,7 +31,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/create" component={CreateRide} />
-      <Route path="/my-rides" component={MyRides} />
+      <Route path="/activities" component={Activities} />
       <Route path="/my-stats" component={MyStats} />
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />

@@ -55,12 +55,12 @@ export default function Navbar() {
                 Create Ride
               </Link>
               <Link 
-                href="/my-rides" 
+                href="/activities" 
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
-                  location === "/my-rides" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
+                  location === "/activities" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
                 }`}
               >
-                My Rides
+                Activities
               </Link>
 
             </div>
