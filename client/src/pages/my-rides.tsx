@@ -3,9 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import RideCard from "@/components/ride-card";
+import LeaveRideModal from "@/components/leave-ride-modal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +17,7 @@ export default function MyRides() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [selectedRideId, setSelectedRideId] = useState<number | null>(null);
+  const [selectedRide, setSelectedRide] = useState<any>(null);
 
   const { data: myRides, isLoading } = useQuery({
     queryKey: ["/api/my-rides"],
@@ -33,7 +32,7 @@ export default function MyRides() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/my-rides"] });
       setShowLeaveModal(false);
-      setSelectedRideId(null);
+      setSelectedRide(null);
     },
     onError: (error: any) => {
       toast({
@@ -45,13 +44,16 @@ export default function MyRides() {
   });
 
   const handleLeaveClick = (rideId: number) => {
-    setSelectedRideId(rideId);
+    const ride = myRides?.all?.find((r: any) => r.id === rideId) || 
+                 myRides?.joined?.find((r: any) => r.id === rideId) || 
+                 myRides?.organized?.find((r: any) => r.id === rideId);
+    setSelectedRide(ride);
     setShowLeaveModal(true);
   };
 
   const confirmLeave = () => {
-    if (selectedRideId) {
-      leaveRideMutation.mutate(selectedRideId);
+    if (selectedRide) {
+      leaveRideMutation.mutate(selectedRide.id);
     }
   };
 
@@ -91,7 +93,7 @@ export default function MyRides() {
                     onJoin={() => {}} // No join functionality needed in My Rides
                     onLeave={handleLeaveClick}
                     onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
                     currentUserId={user?.id}
                   />
                 ))
@@ -126,7 +128,7 @@ export default function MyRides() {
                     onJoin={() => {}} // No join functionality needed in My Rides
                     onLeave={handleLeaveClick}
                     onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
                     currentUserId={user?.id}
                   />
                 ))
@@ -161,7 +163,7 @@ export default function MyRides() {
                     onJoin={() => {}} // No join functionality needed in My Rides
                     onLeave={handleLeaveClick}
                     onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRideId === ride.id}
+                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
                     currentUserId={user?.id}
                   />
                 ))
@@ -180,32 +182,13 @@ export default function MyRides() {
       </div>
 
       {/* Leave Ride Confirmation Modal */}
-      <Dialog open={showLeaveModal} onOpenChange={setShowLeaveModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Leave Ride</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to leave this ride? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowLeaveModal(false)}
-              disabled={leaveRideMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={confirmLeave}
-              disabled={leaveRideMutation.isPending}
-            >
-              {leaveRideMutation.isPending ? "Leaving..." : "Leave Ride"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LeaveRideModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={confirmLeave}
+        isLoading={leaveRideMutation.isPending}
+        rideName={selectedRide?.name}
+      />
     </div>
   );
 }

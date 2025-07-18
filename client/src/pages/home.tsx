@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import RideFilters from "@/components/ride-filters";
 import RideCard from "@/components/ride-card";
+import LeaveRideModal from "@/components/leave-ride-modal";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +18,8 @@ export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = authManager.getState().user;
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [selectedRide, setSelectedRide] = useState<any>(null);
 
   const { data: rides, isLoading } = useQuery({
     queryKey: ["/api/rides", filters],
@@ -54,6 +57,8 @@ export default function Home() {
         description: "You're no longer part of this ride.",
       });
       queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/rides' });
+      setShowLeaveModal(false);
+      setSelectedRide(null);
     },
     onError: (error: any) => {
       toast({
@@ -63,6 +68,18 @@ export default function Home() {
       });
     },
   });
+
+  const handleLeaveClick = (rideId: number) => {
+    const ride = rides?.find((r: any) => r.id === rideId);
+    setSelectedRide(ride);
+    setShowLeaveModal(true);
+  };
+
+  const confirmLeave = () => {
+    if (selectedRide) {
+      leaveRideMutation.mutate(selectedRide.id);
+    }
+  };
 
 
 
@@ -162,10 +179,10 @@ export default function Home() {
                   key={ride.id} 
                   ride={ride} 
                   onJoin={(rideId) => joinRideMutation.mutate(rideId)}
-                  onLeave={(rideId) => leaveRideMutation.mutate(rideId)}
+                  onLeave={handleLeaveClick}
                   onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
                   isJoining={joinRideMutation.isPending}
-                  isLeaving={leaveRideMutation.isPending}
+                  isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
                   currentUserId={user?.id}
                 />
               ))
@@ -196,6 +213,15 @@ export default function Home() {
           <Plus className="w-6 h-6" />
         </Button>
       </div>
+
+      {/* Leave Ride Confirmation Modal */}
+      <LeaveRideModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={confirmLeave}
+        isLoading={leaveRideMutation.isPending}
+        rideName={selectedRide?.name}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { useGPXStats } from "@/hooks/use-gpx-stats";
 import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import GPXMapPreview from "@/components/gpx-map-preview";
+import LeaveRideModal from "@/components/leave-ride-modal";
 import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
@@ -22,6 +23,7 @@ export default function RideDetail() {
   const queryClient = useQueryClient();
   const user = authManager.getUser();
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const { data: ride, isLoading } = useQuery<Ride>({
     queryKey: ['/api/rides', id],
@@ -56,6 +58,7 @@ export default function RideDetail() {
         description: "You're no longer part of this ride.",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+      setShowLeaveModal(false);
     },
     onError: (error: any) => {
       toast({
@@ -65,6 +68,14 @@ export default function RideDetail() {
       });
     },
   });
+
+  const handleLeaveClick = () => {
+    setShowLeaveModal(true);
+  };
+
+  const confirmLeave = () => {
+    leaveRideMutation.mutate();
+  };
 
   const deleteRideMutation = useMutation({
     mutationFn: () => apiRequest('DELETE', `/api/rides/${id}`),
@@ -347,7 +358,7 @@ export default function RideDetail() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => leaveRideMutation.mutate()}
+                      onClick={handleLeaveClick}
                       disabled={leaveRideMutation.isPending}
                     >
                       Leave Ride
@@ -367,6 +378,15 @@ export default function RideDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Leave Ride Confirmation Modal */}
+      <LeaveRideModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={confirmLeave}
+        isLoading={leaveRideMutation.isPending}
+        rideName={ride?.name}
+      />
     </div>
   );
 }
