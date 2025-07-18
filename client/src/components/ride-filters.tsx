@@ -36,7 +36,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Any distance" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[100]">
               <SelectItem value="any">Any distance</SelectItem>
               <SelectItem value="0-5">Within 5 km</SelectItem>
               <SelectItem value="0-10">Within 10 km</SelectItem>
@@ -51,7 +51,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Any date" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[100]">
               <SelectItem value="any">Any date</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="tomorrow">Tomorrow</SelectItem>
@@ -67,7 +67,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Any time" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[100]">
               <SelectItem value="any">Any time</SelectItem>
               <SelectItem value="morning">Morning (6-12 PM)</SelectItem>
               <SelectItem value="afternoon">Afternoon (12-6 PM)</SelectItem>
@@ -82,7 +82,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="All types" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[100]">
               <SelectItem value="any">All types</SelectItem>
               <SelectItem value="coffee">Coffee</SelectItem>
               <SelectItem value="casual">Casual</SelectItem>
@@ -98,7 +98,7 @@ export default function RideFilters({ onFiltersChange }: RideFiltersProps) {
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="All surfaces" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[100]">
               <SelectItem value="any">All surfaces</SelectItem>
               <SelectItem value="paved">Paved</SelectItem>
               <SelectItem value="gravel">Gravel</SelectItem>
