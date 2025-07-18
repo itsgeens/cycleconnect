@@ -159,6 +159,8 @@ The application follows a traditional full-stack architecture with clear separat
 - **Complete Activity Pipeline**: Full end-to-end workflow from GPX upload to data extraction, storage, and display
 - **Performance Metrics Display**: Shows participant's actual distance, time, elevation, and speed instead of generic "N/A" values
 - **Backend API Integration**: Complete-with-data endpoint processes GPX files and creates activity match records
+- **Data Source Fix**: Fixed activities page to use correct endpoint (completed-activities) that includes userActivityData instead of my-rides
+- **Verified End-to-End**: Fully tested GPX upload workflow with multiple participants showing personal performance data correctly
 
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
