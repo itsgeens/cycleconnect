@@ -251,7 +251,7 @@ export default function Activities() {
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => navigate("/upload")}
+                      onClick={() => navigate("/upload-activity")}
                       className="flex items-center gap-2"
                     >
                       <Trophy className="w-4 h-4" />

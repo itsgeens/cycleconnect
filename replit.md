@@ -164,6 +164,9 @@ The application follows a traditional full-stack architecture with clear separat
 - **Activity Filtering System**: Added toggle button to show/hide group rides where user hasn't uploaded GPX data
 - **Statistics Exclusion**: Updated My Stats calculations to only count activities where user has uploaded GPX data, excluding unverified rides
 - **Smart Activity Display**: Activities page now differentiates between verified rides (with user data) and unverified rides (without user data)
+- **Dynamic Performance Button**: Ride detail pages now show "View My Performance" button when user has uploaded GPX data, "Upload Your Activity" when not
+- **Enhanced API Integration**: Fixed ride detail API to include user activity data in authenticated requests for proper button state detection
+- **Navigation Fix**: Corrected upload button routing from activities page to use proper `/upload-activity` route instead of broken `/upload` route
 
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
