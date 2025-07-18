@@ -73,8 +73,14 @@ export default function UploadActivityPage() {
           description: `Matched with planned ride: ${data.matchedRide.name}`,
         });
         navigate("/activities");
+      } else if (data.soloActivity) {
+        toast({
+          title: "Solo activity created!",
+          description: "Your activity has been saved.",
+        });
+        navigate("/activities");
       } else {
-        // No match found, show modal
+        // Fallback for old response format
         setUploadedActivityData(data.activityData);
         setShowNoMatchModal(true);
       }

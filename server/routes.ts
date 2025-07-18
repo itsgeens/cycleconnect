@@ -726,28 +726,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           matchScore: bestMatchScore,
         });
       } else {
-        // No match found - return activity data for user to decide
+        // No match found - create a solo activity automatically
+        const soloActivity = await storage.createSoloActivity({
+          name: `Manual Activity - ${new Date().toLocaleDateString()}`,
+          description: `Solo cycling activity uploaded manually`,
+          activityType: 'cycling',
+          gpxFilePath: `/uploads/${file.filename}`,
+          distance: gpxData.distance?.toString(),
+          duration: gpxData.duration,
+          movingTime: gpxData.movingTime,
+          elevationGain: gpxData.elevationGain?.toString(),
+          averageSpeed: gpxData.averageSpeed?.toString(),
+          averageHeartRate: gpxData.averageHeartRate,
+          maxHeartRate: gpxData.maxHeartRate,
+          calories: gpxData.calories,
+          deviceName: deviceName || 'Manual Upload',
+          deviceType: deviceType || 'manual',
+          completedAt: new Date(),
+          userId,
+        });
+
         res.json({
-          message: "No matching rides found", 
+          message: "Solo activity created successfully", 
           matchedRide: null,
-          activityData: {
-            name: `Manual Activity - ${new Date().toLocaleDateString()}`,
-            description: `Solo cycling activity uploaded manually`,
-            activityType: 'cycling',
-            gpxFilePath: file.path,
-            distance: gpxData.distance?.toString(),
-            duration: gpxData.duration,
-            movingTime: gpxData.movingTime,
-            elevationGain: gpxData.elevationGain?.toString(),
-            averageSpeed: gpxData.averageSpeed?.toString(),
-            averageHeartRate: gpxData.averageHeartRate,
-            maxHeartRate: gpxData.maxHeartRate,
-            calories: gpxData.calories,
-            deviceName: deviceName || 'Manual Upload',
-            deviceType: deviceType || 'manual',
-            completedAt: new Date(),
-            userId,
-          },
+          soloActivity,
           matches: candidateRides.length,
         });
       }
