@@ -272,6 +272,20 @@ export default function RideDetail() {
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 {ride.surfaceType}
               </Badge>
+              {ride.isCompleted ? (
+                <Badge variant="default" className="bg-green-600 text-white">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Completed
+                </Badge>
+              ) : hasRidePassed ? (
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  Ride Finished
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                  Planned
+                </Badge>
+              )}
             </div>
           </div>
           

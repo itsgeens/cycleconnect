@@ -137,7 +137,7 @@ export default function RideCard({
 
           {/* Location */}
           <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-gray-500" />
+            <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
             <span className="text-gray-600 truncate">
               {ride.meetupLocation || 'Meetup location TBD'}
             </span>

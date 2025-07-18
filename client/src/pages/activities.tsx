@@ -160,7 +160,7 @@ export default function Activities() {
           </p>
         </div>
 
-        <Tabs defaultValue="planned" className="w-full">
+        <Tabs defaultValue="completed" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="planned" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
@@ -247,17 +247,29 @@ export default function Activities() {
                     )}
                   </div>
                   
-                  {activitiesWithoutUserData.length > 0 && (
+                  <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
-                      onClick={() => setShowRidesWithoutData(!showRidesWithoutData)}
+                      onClick={() => navigate("/upload")}
                       className="flex items-center gap-2"
                     >
-                      {showRidesWithoutData ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      {showRidesWithoutData ? 'Hide' : 'Show'} joined rides with no user data uploaded
+                      <Trophy className="w-4 h-4" />
+                      Upload Activity
                     </Button>
-                  )}
+                    
+                    {activitiesWithoutUserData.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowRidesWithoutData(!showRidesWithoutData)}
+                        className="flex items-center gap-2"
+                      >
+                        {showRidesWithoutData ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showRidesWithoutData ? 'Hide' : 'Show'} joined rides with no user data uploaded
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Activities List */}
