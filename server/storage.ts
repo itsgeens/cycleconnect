@@ -196,6 +196,8 @@ export class DatabaseStorage implements IStorage {
         meetupLocation: rides.meetupLocation,
         meetupCoords: rides.meetupCoords,
         organizerId: rides.organizerId,
+        isCompleted: rides.isCompleted,
+        completedAt: rides.completedAt,
         createdAt: rides.createdAt,
         organizerName: users.name,
       })
