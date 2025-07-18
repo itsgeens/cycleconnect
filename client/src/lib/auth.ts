@@ -63,7 +63,10 @@ class AuthManager {
   }
 
   public async login(username: string, password: string) {
-    const response = await apiRequest("POST", "/api/login", { username, password });
+    const response = await apiRequest("/api/login", { 
+      method: "POST", 
+      data: { username, password } 
+    });
     const data = await response.json();
     
     localStorage.setItem("sessionId", data.sessionId);
@@ -71,7 +74,10 @@ class AuthManager {
   }
 
   public async register(username: string, email: string, password: string, name: string) {
-    const response = await apiRequest("POST", "/api/register", { username, email, password, name });
+    const response = await apiRequest("/api/register", { 
+      method: "POST", 
+      data: { username, email, password, name } 
+    });
     const data = await response.json();
     
     localStorage.setItem("sessionId", data.sessionId);
@@ -81,7 +87,7 @@ class AuthManager {
   public async logout() {
     if (this.state.sessionId) {
       try {
-        await apiRequest("POST", "/api/logout", {});
+        await apiRequest("/api/logout", { method: "POST" });
       } catch (error) {
         console.error("Logout error:", error);
       }
