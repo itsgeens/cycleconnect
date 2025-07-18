@@ -144,6 +144,14 @@ The application follows a traditional full-stack architecture with clear separat
 - **Accurate Time Display**: Ride times shown in local timezone with timezone indicators on cards
 - **Weather Cards Integration**: Weather conditions and cycling scores displayed on ride cards
 
+### Route Matching Algorithm Improvements (July 18, 2025)
+- **Enhanced Time Window Matching**: Improved algorithm to match activities within 2-hour window of planned rides (previously only matched past-due rides)
+- **Flexible Route Comparison**: More lenient coordinate matching with bonus scoring for routes in same geographic area
+- **Debug Logging System**: Added comprehensive logging for route matching analysis and troubleshooting
+- **Geographic Bonus Scoring**: Routes within 5km of each other receive bonus points for better matching accuracy
+- **Timezone Conversion Fixes**: Fixed Singapore/Philippines timezone detection and display using native Intl.DateTimeFormat API
+- **Improved Coordinate Tolerance**: Enhanced distance calculations for start/end point matching with 10km tolerance instead of 5km
+
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
 - **Time Window Validation**: Automatic completion only if activity starts within 1 hour of planned ride time
