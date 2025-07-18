@@ -748,7 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             completedAt: new Date(),
             userId,
           },
-          matches: pastDueRides.length,
+          matches: candidateRides.length,
         });
       }
     } catch (error) {
