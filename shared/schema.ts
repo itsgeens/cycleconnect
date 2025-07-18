@@ -35,9 +35,18 @@ export const rideParticipants = pgTable("ride_participants", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
 });
 
+export const follows = pgTable("follows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id").references(() => users.id).notNull(),
+  followingId: integer("following_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   organizedRides: many(rides),
   rideParticipations: many(rideParticipants),
+  following: many(follows, { relationName: "follower" }),
+  followers: many(follows, { relationName: "following" }),
 }));
 
 export const ridesRelations = relations(rides, ({ one, many }) => ({
@@ -56,6 +65,19 @@ export const rideParticipantsRelations = relations(rideParticipants, ({ one }) =
   user: one(users, {
     fields: [rideParticipants.userId],
     references: [users.id],
+  }),
+}));
+
+export const followsRelations = relations(follows, ({ one }) => ({
+  follower: one(users, {
+    fields: [follows.followerId],
+    references: [users.id],
+    relationName: "follower",
+  }),
+  following: one(users, {
+    fields: [follows.followingId],
+    references: [users.id],
+    relationName: "following",
   }),
 }));
 
@@ -105,3 +127,4 @@ export type RideFilters = z.infer<typeof rideFiltersSchema>;
 export type User = typeof users.$inferSelect;
 export type Ride = typeof rides.$inferSelect;
 export type RideParticipant = typeof rideParticipants.$inferSelect;
+export type Follow = typeof follows.$inferSelect;

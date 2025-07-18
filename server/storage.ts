@@ -1,4 +1,4 @@
-import { users, rides, rideParticipants, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters } from "@shared/schema";
+import { users, rides, rideParticipants, follows, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
@@ -13,6 +13,7 @@ export interface IStorage {
   createRide(ride: InsertRide & { organizerId: number, gpxFilePath: string }): Promise<Ride>;
   getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number }>>;
   getRide(id: number): Promise<Ride | undefined>;
+  deleteRide(id: number): Promise<void>;
   
   // Participant operations
   joinRide(rideId: number, userId: number): Promise<void>;
@@ -40,10 +41,24 @@ export interface IStorage {
     ridesHostedChange: number;
     totalDistanceChange: number;
     totalElevationChange: number;
+    followersCount: number;
+    followingCount: number;
   }>;
   
   // Completed rides
   getUserCompletedRides(userId: number, limit?: number): Promise<Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>>;
+  
+  // Rider operations
+  getRiders(currentUserId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number; isFollowing: boolean }>>;
+  
+  // Follow operations
+  followUser(followerId: number, followingId: number): Promise<void>;
+  unfollowUser(followerId: number, followingId: number): Promise<void>;
+  isFollowing(followerId: number, followingId: number): Promise<boolean>;
+  getFollowerCount(userId: number): Promise<number>;
+  getFollowingCount(userId: number): Promise<number>;
+  getFollowers(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>>;
+  getFollowing(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -83,6 +98,10 @@ export class DatabaseStorage implements IStorage {
     });
     
     return ride;
+  }
+
+  async deleteRide(id: number): Promise<void> {
+    await db.delete(rides).where(eq(rides.id, id));
   }
 
   async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>> {
@@ -404,6 +423,10 @@ export class DatabaseStorage implements IStorage {
     const current = currentStats[0] || { ridesJoined: 0, ridesHosted: 0, totalDistance: 0, totalElevation: 0 };
     const previous = previousStats[0] || { ridesJoined: 0, ridesHosted: 0, totalDistance: 0, totalElevation: 0 };
 
+    // Get follower/following counts
+    const followersCount = await this.getFollowerCount(userId);
+    const followingCount = await this.getFollowingCount(userId);
+
     return {
       ridesJoined: Number(current.ridesJoined),
       ridesHosted: Number(current.ridesHosted),
@@ -413,6 +436,8 @@ export class DatabaseStorage implements IStorage {
       ridesHostedChange: Number(current.ridesHosted) - Number(previous.ridesHosted),
       totalDistanceChange: Number(current.totalDistance) - Number(previous.totalDistance),
       totalElevationChange: Number(current.totalElevation) - Number(previous.totalElevation),
+      followersCount,
+      followingCount,
     };
   }
 
@@ -459,6 +484,127 @@ export class DatabaseStorage implements IStorage {
       participantCount: Number(ride.participantCount),
       completedAt: ride.completedAt!,
     }));
+  }
+
+  async getRiders(currentUserId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number; isFollowing: boolean }>> {
+    const ridersQuery = db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        password: users.password,
+        name: users.name,
+        createdAt: users.createdAt,
+        followersCount: sql<number>`count(distinct f1.${follows.followerId})`,
+        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
+        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`,
+        isFollowing: sql<boolean>`exists(select 1 from ${follows} f2 where f2.${follows.followerId} = ${currentUserId} and f2.${follows.followingId} = ${users.id})`
+      })
+      .from(users)
+      .leftJoin(sql`${follows} as f1`, sql`f1.${follows.followingId} = ${users.id}`)
+      .leftJoin(rides, eq(rides.organizerId, users.id))
+      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
+      .where(sql`${users.id} != ${currentUserId}`)
+      .groupBy(users.id)
+      .orderBy(desc(sql`count(distinct f1.${follows.followerId})`));
+
+    const riders = await ridersQuery;
+    return riders;
+  }
+
+  async followUser(followerId: number, followingId: number): Promise<void> {
+    await db.insert(follows).values({
+      followerId,
+      followingId
+    });
+  }
+
+  async unfollowUser(followerId: number, followingId: number): Promise<void> {
+    await db.delete(follows).where(
+      and(
+        eq(follows.followerId, followerId),
+        eq(follows.followingId, followingId)
+      )
+    );
+  }
+
+  async isFollowing(followerId: number, followingId: number): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
+        )
+      );
+    return !!result;
+  }
+
+  async getFollowerCount(userId: number): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(follows)
+      .where(eq(follows.followingId, userId));
+    return result.count;
+  }
+
+  async getFollowingCount(userId: number): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    return result.count;
+  }
+
+  async getFollowers(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>> {
+    const followersQuery = db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        password: users.password,
+        name: users.name,
+        createdAt: users.createdAt,
+        followersCount: sql<number>`count(distinct f2.${follows.followerId})`,
+        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
+        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`
+      })
+      .from(users)
+      .innerJoin(follows, eq(follows.followerId, users.id))
+      .leftJoin(sql`${follows} as f2`, sql`f2.${follows.followingId} = ${users.id}`)
+      .leftJoin(rides, eq(rides.organizerId, users.id))
+      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
+      .where(eq(follows.followingId, userId))
+      .groupBy(users.id);
+
+    const followers = await followersQuery;
+    return followers;
+  }
+
+  async getFollowing(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>> {
+    const followingQuery = db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        password: users.password,
+        name: users.name,
+        createdAt: users.createdAt,
+        followersCount: sql<number>`count(distinct f2.${follows.followerId})`,
+        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
+        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`
+      })
+      .from(users)
+      .innerJoin(follows, eq(follows.followingId, users.id))
+      .leftJoin(sql`${follows} as f2`, sql`f2.${follows.followingId} = ${users.id}`)
+      .leftJoin(rides, eq(rides.organizerId, users.id))
+      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
+      .where(eq(follows.followerId, userId))
+      .groupBy(users.id);
+
+    const following = await followingQuery;
+    return following;
   }
 }
 

@@ -345,6 +345,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Riders discovery routes
+  app.get("/api/riders", requireAuth, async (req, res) => {
+    try {
+      const riders = await storage.getRiders(req.userId!);
+      res.json(riders);
+    } catch (error) {
+      console.error("Get riders error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Follow/unfollow routes
+  app.post("/api/users/:id/follow", requireAuth, async (req, res) => {
+    try {
+      const followingId = parseInt(req.params.id);
+      const followerId = req.userId!;
+      
+      if (followerId === followingId) {
+        return res.status(400).json({ message: "Cannot follow yourself" });
+      }
+      
+      const isAlreadyFollowing = await storage.isFollowing(followerId, followingId);
+      if (isAlreadyFollowing) {
+        return res.status(400).json({ message: "Already following this user" });
+      }
+      
+      await storage.followUser(followerId, followingId);
+      res.json({ message: "User followed successfully" });
+    } catch (error) {
+      console.error("Follow user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/users/:id/unfollow", requireAuth, async (req, res) => {
+    try {
+      const followingId = parseInt(req.params.id);
+      const followerId = req.userId!;
+      
+      await storage.unfollowUser(followerId, followingId);
+      res.json({ message: "User unfollowed successfully" });
+    } catch (error) {
+      console.error("Unfollow user error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Follower/following routes
+  app.get("/api/users/:id/followers", requireAuth, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const followers = await storage.getFollowers(userId);
+      res.json(followers);
+    } catch (error) {
+      console.error("Get followers error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/users/:id/following", requireAuth, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const following = await storage.getFollowing(userId);
+      res.json(following);
+    } catch (error) {
+      console.error("Get following error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

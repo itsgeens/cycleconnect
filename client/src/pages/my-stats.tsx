@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import RideCard from "@/components/ride-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,12 +17,15 @@ import {
   Trophy,
   Activity,
   Users,
-  MapPin
+  MapPin,
+  UserPlus,
+  ExternalLink
 } from "lucide-react";
 
 export default function MyStats() {
   const [timeframe, setTimeframe] = useState("last-month");
   const [showAllRides, setShowAllRides] = useState(false);
+  const [, navigate] = useLocation();
   const user = authManager.getState().user;
 
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -154,6 +158,37 @@ export default function MyStats() {
               </Card>
             </>
           )}
+        </div>
+
+        {/* Social Stats Section */}
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${user?.id}`)}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Followers
+                <ExternalLink className="h-3 w-3 ml-auto" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
+              <p className="text-sm text-gray-500">People following you</p>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${user?.id}`)}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Following
+                <ExternalLink className="h-3 w-3 ml-auto" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
+              <p className="text-sm text-gray-500">People you're following</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Completed Rides Section */}

@@ -44,7 +44,7 @@ export default function Navbar() {
                   location === "/" ? "text-cycling-blue" : "text-gray-900 hover:text-cycling-blue"
                 }`}
               >
-                Discover Rides
+                Discover
               </Link>
               <Link 
                 href="/create" 
