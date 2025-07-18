@@ -134,7 +134,7 @@ export default function RideCard({
         {/* Join/Leave Button */}
         {!isOwner && (
           <div className="flex justify-end">
-            {isParticipant ? (
+            {isParticipant || showLeaveButton ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -145,14 +145,16 @@ export default function RideCard({
                 {isLeaving ? 'Leaving...' : 'Leave Ride'}
               </Button>
             ) : (
-              <Button
-                size="sm"
-                onClick={handleJoinClick}
-                disabled={isJoining}
-                className="text-sm"
-              >
-                {isJoining ? 'Joining...' : 'Join Ride'}
-              </Button>
+              onJoin && (
+                <Button
+                  size="sm"
+                  onClick={handleJoinClick}
+                  disabled={isJoining}
+                  className="text-sm"
+                >
+                  {isJoining ? 'Joining...' : 'Join Ride'}
+                </Button>
+              )
             )}
           </div>
         )}
