@@ -64,8 +64,11 @@ export function parseGPXContent(gpxContent: string): GpxData {
       if (!maxTime || time > maxTime) maxTime = time;
     }
 
-    // Extract heart rate
-    const hrMatch = content.match(/<ns3:hr>([^<]+)<\/ns3:hr>/) || content.match(/<hr>([^<]+)<\/hr>/);
+    // Extract heart rate (support multiple Garmin extensions)
+    const hrMatch = content.match(/<ns3:hr>([^<]+)<\/ns3:hr>/) || 
+                   content.match(/<hr>([^<]+)<\/hr>/) ||
+                   content.match(/<gpxtpx:hr>([^<]+)<\/gpxtpx:hr>/) ||
+                   content.match(/<TrackPointExtension>[\s\S]*?<hr>([^<]+)<\/hr>/);
     if (hrMatch) {
       heartRate = parseInt(hrMatch[1]);
       heartRates.push(heartRate);
