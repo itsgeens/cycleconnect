@@ -82,9 +82,9 @@ export default function MyStats() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
           {statsLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
+            Array.from({ length: 5 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader className="pb-2">
                   <Skeleton className="h-4 w-24" />
@@ -123,6 +123,21 @@ export default function MyStats() {
                   <div className="text-2xl font-bold text-gray-900">{stats?.ridesHosted || 0}</div>
                   <Badge variant="secondary" className="mt-1">
                     {stats?.ridesHostedChange >= 0 ? '+' : ''}{stats?.ridesHostedChange || 0} from previous
+                  </Badge>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Solo Rides
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">{stats?.soloRides || 0}</div>
+                  <Badge variant="secondary" className="mt-1">
+                    {stats?.soloRidesChange >= 0 ? '+' : ''}{stats?.soloRidesChange || 0} from previous
                   </Badge>
                 </CardContent>
               </Card>

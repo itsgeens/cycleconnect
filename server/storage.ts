@@ -374,10 +374,12 @@ export class DatabaseStorage implements IStorage {
   async getUserStats(userId: number, timeframe: string): Promise<{
     ridesJoined: number;
     ridesHosted: number;
+    soloRides: number;
     totalDistance: number;
     totalElevation: number;
     ridesJoinedChange: number;
     ridesHostedChange: number;
+    soloRidesChange: number;
     totalDistanceChange: number;
     totalElevationChange: number;
   }> {
@@ -498,6 +500,7 @@ export class DatabaseStorage implements IStorage {
     // Get solo activities stats for current period
     const currentSoloStats = await db
       .select({
+        soloRidesCount: sql<number>`COUNT(*)`,
         soloDistance: sql<number>`SUM(CASE 
           WHEN ${soloActivities.distance} IS NOT NULL 
           THEN CAST(${soloActivities.distance} AS DECIMAL) 
@@ -521,6 +524,7 @@ export class DatabaseStorage implements IStorage {
     // Get solo activities stats for previous period
     const previousSoloStats = await db
       .select({
+        soloRidesCount: sql<number>`COUNT(*)`,
         soloDistance: sql<number>`SUM(CASE 
           WHEN ${soloActivities.distance} IS NOT NULL 
           THEN CAST(${soloActivities.distance} AS DECIMAL) 
@@ -541,8 +545,8 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    const currentSolo = currentSoloStats[0] || { soloDistance: 0, soloElevation: 0 };
-    const previousSolo = previousSoloStats[0] || { soloDistance: 0, soloElevation: 0 };
+    const currentSolo = currentSoloStats[0] || { soloRidesCount: 0, soloDistance: 0, soloElevation: 0 };
+    const previousSolo = previousSoloStats[0] || { soloRidesCount: 0, soloDistance: 0, soloElevation: 0 };
 
     // Calculate totals including solo activities
     const totalCurrentDistance = Number(current.totalDistance) + Number(currentSolo.soloDistance);
@@ -557,11 +561,13 @@ export class DatabaseStorage implements IStorage {
     return {
       ridesJoined: Number(current.ridesJoined),
       ridesHosted: Number(current.ridesHosted),
-      totalDistance: totalCurrentDistance,
+      soloRides: Number(currentSolo.soloRidesCount),
+      totalDistance: Number(totalCurrentDistance.toFixed(2)),
       totalElevation: totalCurrentElevation,
       ridesJoinedChange: Number(current.ridesJoined) - Number(previous.ridesJoined),
       ridesHostedChange: Number(current.ridesHosted) - Number(previous.ridesHosted),
-      totalDistanceChange: totalCurrentDistance - totalPreviousDistance,
+      soloRidesChange: Number(currentSolo.soloRidesCount) - Number(previousSolo.soloRidesCount),
+      totalDistanceChange: Number((totalCurrentDistance - totalPreviousDistance).toFixed(2)),
       totalElevationChange: totalCurrentElevation - totalPreviousElevation,
       followersCount,
       followingCount,
