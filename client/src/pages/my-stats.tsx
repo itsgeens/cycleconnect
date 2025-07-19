@@ -196,7 +196,7 @@ export default function MyStats() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              Completed Rides
+              Completed Group Rides
             </CardTitle>
             <CardDescription>
               Your cycling achievements and completed adventures
