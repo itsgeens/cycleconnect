@@ -168,6 +168,14 @@ The application follows a traditional full-stack architecture with clear separat
 - **Enhanced API Integration**: Fixed ride detail API to include user activity data in authenticated requests for proper button state detection
 - **Navigation Fix**: Corrected upload button routing from activities page to use proper `/upload-activity` route instead of broken `/upload` route
 
+### Android APK Packaging (July 19, 2025)
+- **Capacitor Integration**: Added full Capacitor setup for wrapping web app in native Android container
+- **Bluetooth Permissions**: Comprehensive bluetooth and location permissions for device connectivity testing
+- **Native Device Access**: @capacitor-community/bluetooth-le plugin for direct bluetooth device connections
+- **Build System**: Complete Android build configuration with APK generation capability
+- **Mobile Testing**: Enables installation on Android devices for testing bluetooth device connections in real environment
+- **Development Workflow**: Build scripts and documentation for generating debug APKs
+
 ### Technical Implementation Details
 - **Route Matching**: Uses geometric similarity (Hausdorff distance), temporal alignment (Dynamic Time Warping), and elevation correlation
 - **Time Window Validation**: Automatic completion only if activity starts within 1 hour of planned ride time
@@ -176,3 +184,4 @@ The application follows a traditional full-stack architecture with clear separat
 - **Automatic Validation**: 85% route similarity threshold with configurable parameters
 - **Active Time Calculation**: Moving time excludes stops below 0.5 km/h threshold for accurate performance metrics
 - **Timezone Handling**: Intelligent timezone detection based on GPX coordinates and meetup locations for accurate time display
+- **Mobile Packaging**: Capacitor-based Android APK generation with native bluetooth device access

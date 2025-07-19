@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CycleConnect</string>
+    <string name="title_activity_main">CycleConnect</string>
+    <string name="package_name">com.cycleconnect.app</string>
+    <string name="custom_url_scheme">com.cycleconnect.app</string>
+</resources>
