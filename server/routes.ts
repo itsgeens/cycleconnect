@@ -514,6 +514,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get stats for a specific user
+  app.get("/api/user-stats/:userId", requireAuth, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const timeframe = req.query.timeframe as string || "last-month";
+      const stats = await storage.getUserStats(userId, timeframe);
+      
+      // Also get user info
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        ...stats,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username
+        }
+      });
+    } catch (error) {
+      console.error("Get user stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // User completed rides routes
   app.get("/api/my-completed-rides", requireAuth, async (req, res) => {
     try {

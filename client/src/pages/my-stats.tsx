@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/navbar";
 import RideCard from "@/components/ride-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,22 +26,54 @@ export default function MyStats() {
   const [timeframe, setTimeframe] = useState("last-month");
   const [showAllRides, setShowAllRides] = useState(false);
   const [, navigate] = useLocation();
-  const user = authManager.getState().user;
+  const { userId } = useParams<{ userId: string }>();
+  const currentUser = authManager.getState().user;
+  
+  // Determine if viewing own stats or another user's stats
+  const isOwnStats = !userId;
+  const targetUserId = isOwnStats ? currentUser?.id : parseInt(userId!);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/my-stats", { timeframe }],
+    queryKey: [isOwnStats ? "/api/my-stats" : "/api/user-stats", targetUserId, { timeframe }],
+    queryFn: async () => {
+      const sessionId = localStorage.getItem("sessionId");
+      const endpoint = isOwnStats ? `/api/my-stats?timeframe=${timeframe}` : `/api/user-stats/${targetUserId}?timeframe=${timeframe}`;
+      const response = await fetch(endpoint, {
+        headers: {
+          "Authorization": `Bearer ${sessionId}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch stats");
+      return response.json();
+    },
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache the data (updated property name)
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    enabled: !!targetUserId,
   });
 
   const { data: completedRides, isLoading: ridesLoading } = useQuery({
-    queryKey: ["/api/my-completed-rides", { limit: showAllRides ? "all" : "5" }],
+    queryKey: [isOwnStats ? "/api/my-completed-rides" : "/api/user-completed-rides", targetUserId, { limit: showAllRides ? "all" : "5" }],
+    queryFn: async () => {
+      if (!isOwnStats) {
+        // For other users, we don't show their completed rides for privacy
+        return [];
+      }
+      const sessionId = localStorage.getItem("sessionId");
+      const response = await fetch(`/api/my-completed-rides?limit=${showAllRides ? "all" : "5"}`, {
+        headers: {
+          "Authorization": `Bearer ${sessionId}`,
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch completed rides");
+      return response.json();
+    },
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache the data (updated property name)
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    enabled: !!targetUserId,
   });
 
   const timeframeOptions = [
@@ -58,8 +90,12 @@ export default function MyStats() {
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Stats</h1>
-          <p className="text-gray-600">Track your cycling achievements and progress</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isOwnStats ? "My Stats" : `${stats?.user?.name || "User"}'s Stats`}
+          </h1>
+          <p className="text-gray-600">
+            {isOwnStats ? "Track your cycling achievements and progress" : `View ${stats?.user?.name || "this user"}'s cycling achievements and progress`}
+          </p>
         </div>
 
         {/* Time Frame Selector */}
@@ -177,7 +213,7 @@ export default function MyStats() {
 
         {/* Social Stats Section */}
         <div className="grid gap-6 md:grid-cols-2 mb-8">
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${user?.id}`)}>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${targetUserId}`)}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -187,11 +223,11 @@ export default function MyStats() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
-              <p className="text-sm text-gray-500">People following you</p>
+              <p className="text-sm text-gray-500">People following {isOwnStats ? 'you' : stats?.user?.name || 'them'}</p>
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${user?.id}`)}>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${targetUserId}`)}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
@@ -201,22 +237,23 @@ export default function MyStats() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
-              <p className="text-sm text-gray-500">People you're following</p>
+              <p className="text-sm text-gray-500">People {isOwnStats ? "you're" : `${stats?.user?.name || 'they are'}`} following</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Completed Rides Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Completed Group Rides
-            </CardTitle>
-            <CardDescription>
-              Your cycling achievements and completed adventures
-            </CardDescription>
-          </CardHeader>
+        {/* Completed Rides Section - Only show for own stats */}
+        {isOwnStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Completed Group Rides
+              </CardTitle>
+              <CardDescription>
+                Your cycling achievements and completed adventures
+              </CardDescription>
+            </CardHeader>
           <CardContent>
             {ridesLoading ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -260,6 +297,7 @@ export default function MyStats() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );

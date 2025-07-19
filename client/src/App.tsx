@@ -36,6 +36,7 @@ function Router() {
       <Route path="/activities" component={Activities} />
       <Route path="/upload-activity" component={UploadActivity} />
       <Route path="/my-stats" component={MyStats} />
+      <Route path="/stats/:userId" component={MyStats} />
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />
       <Route path="/ride/:id" component={RideDetail} />

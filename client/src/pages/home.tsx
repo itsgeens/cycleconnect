@@ -247,7 +247,11 @@ export default function Home() {
               ))
             ) : riders?.length > 0 ? (
               riders.map((rider: any) => (
-                <Card key={rider.id} className="hover:shadow-lg transition-shadow">
+                <Card 
+                  key={rider.id} 
+                  className="hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/stats/${rider.id}`)}
+                >
                   <CardHeader className="text-center pb-4">
                     <Avatar className="w-16 h-16 mx-auto mb-4">
                       <AvatarFallback className="bg-cycling-blue text-white text-lg">
@@ -276,7 +280,8 @@ export default function Home() {
                       <Button 
                         className="w-full"
                         variant={rider.isFollowing ? "outline" : "default"}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent card click when clicking button
                           if (rider.isFollowing) {
                             unfollowMutation.mutate(rider.id);
                           } else {
