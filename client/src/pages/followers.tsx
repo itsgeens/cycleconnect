@@ -21,7 +21,12 @@ export default function FollowersPage() {
   const { data: followers, isLoading: isLoadingFollowers } = useQuery({
     queryKey: [`/api/users/${userId}/followers`],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}/followers`);
+      const sessionId = localStorage.getItem("sessionId");
+      const response = await fetch(`/api/users/${userId}/followers`, {
+        headers: {
+          "Authorization": `Bearer ${sessionId}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch followers");
       return response.json();
     },
@@ -31,7 +36,12 @@ export default function FollowersPage() {
   const { data: following, isLoading: isLoadingFollowing } = useQuery({
     queryKey: [`/api/users/${userId}/following`],
     queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}/following`);
+      const sessionId = localStorage.getItem("sessionId");
+      const response = await fetch(`/api/users/${userId}/following`, {
+        headers: {
+          "Authorization": `Bearer ${sessionId}`,
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch following");
       return response.json();
     },
@@ -86,7 +96,11 @@ export default function FollowersPage() {
     }
 
     return users.map((user: any) => (
-      <Card key={user.id} className="hover:shadow-lg transition-shadow">
+      <Card 
+        key={user.id} 
+        className="hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={() => navigate(`/stats/${user.id}`)}
+      >
         <CardHeader className="text-center pb-4">
           <Avatar className="w-16 h-16 mx-auto mb-4">
             <AvatarFallback className="bg-cycling-blue text-white text-lg">

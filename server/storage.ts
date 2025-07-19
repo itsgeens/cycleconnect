@@ -716,7 +716,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFollowers(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>> {
-    const followersQuery = db
+    // First get the basic follower users
+    const followerUsers = await db
       .select({
         id: users.id,
         username: users.username,
@@ -724,24 +725,48 @@ export class DatabaseStorage implements IStorage {
         password: users.password,
         name: users.name,
         createdAt: users.createdAt,
-        followersCount: sql<number>`count(distinct f2.${follows.followerId})`,
-        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
-        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`
       })
       .from(users)
       .innerJoin(follows, eq(follows.followerId, users.id))
-      .leftJoin(sql`${follows} as f2`, sql`f2.${follows.followingId} = ${users.id}`)
-      .leftJoin(rides, eq(rides.organizerId, users.id))
-      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
-      .where(eq(follows.followingId, userId))
-      .groupBy(users.id);
+      .where(eq(follows.followingId, userId));
 
-    const followers = await followersQuery;
-    return followers;
+    // Add stats for each user
+    const followersWithStats = await Promise.all(
+      followerUsers.map(async (user) => {
+        const [followerCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(follows)
+          .where(eq(follows.followingId, user.id));
+        
+        const [completedRidesCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rideParticipants)
+          .innerJoin(rides, eq(rides.id, rideParticipants.rideId))
+          .where(and(
+            eq(rideParticipants.userId, user.id),
+            eq(rides.isCompleted, true)
+          ));
+
+        const [hostedRidesCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rides)
+          .where(eq(rides.organizerId, user.id));
+
+        return {
+          ...user,
+          followersCount: followerCount.count || 0,
+          completedRides: completedRidesCount.count || 0,
+          hostedRides: hostedRidesCount.count || 0
+        };
+      })
+    );
+
+    return followersWithStats;
   }
 
   async getFollowing(userId: number): Promise<Array<User & { followersCount: number; completedRides: number; hostedRides: number }>> {
-    const followingQuery = db
+    // First get the basic following users
+    const followingUsers = await db
       .select({
         id: users.id,
         username: users.username,
@@ -749,20 +774,43 @@ export class DatabaseStorage implements IStorage {
         password: users.password,
         name: users.name,
         createdAt: users.createdAt,
-        followersCount: sql<number>`count(distinct f2.${follows.followerId})`,
-        completedRides: sql<number>`count(distinct case when ${rides.isCompleted} = true and ${rideParticipants.userId} = ${users.id} then ${rides.id} end)`,
-        hostedRides: sql<number>`count(distinct case when ${rides.organizerId} = ${users.id} then ${rides.id} end)`
       })
       .from(users)
       .innerJoin(follows, eq(follows.followingId, users.id))
-      .leftJoin(sql`${follows} as f2`, sql`f2.${follows.followingId} = ${users.id}`)
-      .leftJoin(rides, eq(rides.organizerId, users.id))
-      .leftJoin(rideParticipants, eq(rideParticipants.userId, users.id))
-      .where(eq(follows.followerId, userId))
-      .groupBy(users.id);
+      .where(eq(follows.followerId, userId));
 
-    const following = await followingQuery;
-    return following;
+    // Add stats for each user
+    const followingWithStats = await Promise.all(
+      followingUsers.map(async (user) => {
+        const [followerCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(follows)
+          .where(eq(follows.followingId, user.id));
+        
+        const [completedRidesCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rideParticipants)
+          .innerJoin(rides, eq(rides.id, rideParticipants.rideId))
+          .where(and(
+            eq(rideParticipants.userId, user.id),
+            eq(rides.isCompleted, true)
+          ));
+
+        const [hostedRidesCount] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rides)
+          .where(eq(rides.organizerId, user.id));
+
+        return {
+          ...user,
+          followersCount: followerCount.count || 0,
+          completedRides: completedRidesCount.count || 0,
+          hostedRides: hostedRidesCount.count || 0
+        };
+      })
+    );
+
+    return followingWithStats;
   }
 
   // Device operations
