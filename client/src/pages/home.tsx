@@ -17,6 +17,8 @@ import { Plus, Users, MapPin, Activity, UserPlus, Calendar, Trophy } from "lucid
 
 export default function Home() {
   const [filters, setFilters] = useState({});
+  const [showAllRides, setShowAllRides] = useState(false);
+  const [showAllFriends, setShowAllFriends] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -180,7 +182,7 @@ export default function Home() {
                 </div>
               ))
             ) : rides?.length > 0 ? (
-              rides.map((ride: any) => (
+              (showAllRides ? rides : rides.slice(0, 8)).map((ride: any) => (
                 <RideCard 
                   key={ride.id} 
                   ride={ride} 
@@ -206,6 +208,19 @@ export default function Home() {
               </div>
             )}
           </div>
+          
+          {/* See more rides button */}
+          {rides && rides.length > 8 && !showAllRides && (
+            <div className="text-center mt-8">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAllRides(true)}
+                className="px-8"
+              >
+                See More Rides ({rides.length - 8} more)
+              </Button>
+            </div>
+          )}
         </section>
 
         {/* Discover Friends Section */}
@@ -246,7 +261,7 @@ export default function Home() {
                 </Card>
               ))
             ) : riders?.length > 0 ? (
-              riders.map((rider: any) => (
+              (showAllFriends ? riders : riders.slice(0, 8)).map((rider: any) => (
                 <Card 
                   key={rider.id} 
                   className="hover:shadow-lg transition-shadow cursor-pointer"
@@ -316,6 +331,19 @@ export default function Home() {
               </div>
             )}
           </div>
+          
+          {/* See more friends button */}
+          {riders && riders.length > 8 && !showAllFriends && (
+            <div className="text-center mt-8">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAllFriends(true)}
+                className="px-8"
+              >
+                See More Friends ({riders.length - 8} more)
+              </Button>
+            </div>
+          )}
         </section>
       </div>
 

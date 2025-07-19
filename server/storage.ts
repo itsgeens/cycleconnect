@@ -631,7 +631,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(sql`${users.id} != ${currentUserId}`);
 
-    // Get stats for each user
+    // Get stats for each user and filter out already following users
     const ridersWithStats = await Promise.all(
       allUsers.map(async (user) => {
         const followersCount = await this.getFollowerCount(user.id);
@@ -666,8 +666,9 @@ export class DatabaseStorage implements IStorage {
       })
     );
 
-    // Sort by followers count descending
-    return ridersWithStats.sort((a, b) => b.followersCount - a.followersCount);
+    // Filter out users that are already being followed and sort by followers count descending
+    const unfollowedRiders = ridersWithStats.filter(rider => !rider.isFollowing);
+    return unfollowedRiders.sort((a, b) => b.followersCount - a.followersCount);
   }
 
   async followUser(followerId: number, followingId: number): Promise<void> {
