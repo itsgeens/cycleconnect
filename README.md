@@ -1,6 +1,6 @@
 # CycleConnect 🚴‍♂️
 
-A comprehensive cycling community platform that connects riders, organizes group rides, and tracks performance with smart device integration.
+Initial build on Replit. A comprehensive cycling community platform that connects riders, organizes group rides, and tracks performance with smart device integration.
 
 ## Features
 
