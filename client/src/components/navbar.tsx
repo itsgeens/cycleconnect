@@ -89,6 +89,7 @@ export default function Navbar() {
                       Manage Devices
                     </Link>
                   </DropdownMenuItem>
+
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout

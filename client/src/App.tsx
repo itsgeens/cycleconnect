@@ -14,6 +14,7 @@ import FollowersPage from "@/pages/followers";
 import ManageDevices from "@/pages/manage-devices";
 import UploadActivity from "@/pages/upload-activity";
 import MyPerformance from "@/pages/my-performance";
+
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/ride/:id" component={RideDetail} />
       <Route path="/my-performance/:id" component={MyPerformance} />
       <Route path="/my-performance/solo/:id" component={MyPerformance} />
+
       <Route component={NotFound} />
     </Switch>
   );

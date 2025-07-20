@@ -1,4 +1,4 @@
-import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, soloActivities, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch, type SoloActivity, type InsertSoloActivity } from "@shared/schema";
+import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, soloActivities, organizerGpxFiles, participantMatches, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch, type SoloActivity, type InsertSoloActivity, type OrganizerGpxFile, type InsertOrganizerGpxFile, type ParticipantMatch, type InsertParticipantMatch } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 
@@ -72,6 +72,10 @@ export interface IStorage {
   getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
   getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
   getUserActivityForRide(rideId: number, userId: number): Promise<ActivityMatch | undefined>;
+  
+  // Organizer operations
+  getOrganizerPlannedRides(organizerId: number, date: Date): Promise<Array<Ride>>;
+  getOrganizerGpxForRide(rideId: number): Promise<OrganizerGpxFile | undefined>;
 
   // Solo activities operations
   createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity>;
@@ -82,6 +86,28 @@ export interface IStorage {
     completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
     soloActivities: SoloActivity[];
   }>;
+
+  // Organizer GPX operations
+  createOrganizerGpx(gpxFile: InsertOrganizerGpxFile): Promise<OrganizerGpxFile>;
+  getOrganizerGpx(rideId: number): Promise<OrganizerGpxFile | undefined>;
+  getOrganizerGpxById(id: number): Promise<OrganizerGpxFile | undefined>;
+  linkOrganizerGpx(rideId: number, gpxId: number, isManual: boolean): Promise<void>;
+  updateOrganizerGpx(id: number, updates: Partial<OrganizerGpxFile>): Promise<void>;
+
+  // Participant proximity matching operations
+  createParticipantMatch(match: InsertParticipantMatch): Promise<ParticipantMatch>;
+  getParticipantMatches(rideId: number): Promise<ParticipantMatch[]>;
+  getParticipantMatch(rideId: number, participantId: number): Promise<ParticipantMatch | undefined>;
+  updateParticipantMatch(id: number, updates: Partial<ParticipantMatch>): Promise<void>;
+
+  // Advanced matching operations
+  getOrganizerPlannedRides(organizerId: number, dateFilter?: Date): Promise<Array<Ride & { organizerName: string }>>;
+  getRideParticipantIds(rideId: number): Promise<number[]>;
+  getPendingParticipantGpxFiles(rideId: number, participantIds: number[]): Promise<Array<{
+    userId: number;
+    gpxFilePath: string;
+    activityDate: Date;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -130,8 +156,8 @@ export class DatabaseStorage implements IStorage {
 
 
   async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>> {
-    // Build the conditions array
-    const conditions = [sql`${rides.dateTime} >= NOW()`];
+    // Build the conditions array - only show non-completed rides
+    const conditions = [eq(rides.isCompleted, false)];
     
     if (filters?.rideType) {
       conditions.push(eq(rides.rideType, filters.rideType));
@@ -358,11 +384,6 @@ export class DatabaseStorage implements IStorage {
     const [ride] = await db.select().from(rides).where(eq(rides.id, rideId));
     if (!ride || ride.organizerId !== userId) {
       throw new Error("Only the organizer can complete a ride");
-    }
-
-    // Check if ride date has passed
-    if (new Date(ride.dateTime) > new Date()) {
-      throw new Error("Cannot complete a ride before its scheduled time");
     }
 
     await db
@@ -1000,6 +1021,7 @@ export class DatabaseStorage implements IStorage {
     // Get user's activity data for each completed ride
     const ridesWithUserData = await Promise.all(
       completedRides.map(async (ride) => {
+        // First check for participant activity data
         const [userActivityData] = await db
           .select()
           .from(activityMatches)
@@ -1011,11 +1033,43 @@ export class DatabaseStorage implements IStorage {
           )
           .limit(1);
 
-        console.log(`User activity data for ride ${ride.id}:`, userActivityData);
+        // If no participant data found and user is the organizer, check for organizer GPX data
+        let finalUserActivityData = userActivityData;
+        if (!userActivityData && ride.organizerId === userId) {
+          const [organizerGpxData] = await db
+            .select()
+            .from(organizerGpxFiles)
+            .where(eq(organizerGpxFiles.rideId, ride.id))
+            .limit(1);
+          
+          // Convert organizer GPX data to ActivityMatch format for consistency
+          if (organizerGpxData) {
+            finalUserActivityData = {
+              id: organizerGpxData.id,
+              rideId: organizerGpxData.rideId,
+              userId: userId, // Current user (organizer)
+              deviceId: 'organizer-gpx',
+              routeMatchPercentage: organizerGpxData.matchScore,
+              gpxFilePath: organizerGpxData.gpxFilePath,
+              distance: organizerGpxData.distance,
+              duration: organizerGpxData.duration,
+              movingTime: organizerGpxData.movingTime,
+              elevationGain: organizerGpxData.elevationGain,
+              averageSpeed: organizerGpxData.averageSpeed,
+              averageHeartRate: organizerGpxData.averageHeartRate,
+              maxHeartRate: organizerGpxData.maxHeartRate,
+              calories: organizerGpxData.calories,
+              completedAt: organizerGpxData.linkedAt || ride.completedAt,
+              matchedAt: organizerGpxData.linkedAt || ride.completedAt,
+            };
+          }
+        }
+
+        console.log(`User activity data for ride ${ride.id}:`, finalUserActivityData);
 
         const result = {
           ...ride,
-          userActivityData,
+          userActivityData: finalUserActivityData,
         };
         
         console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
@@ -1031,6 +1085,192 @@ export class DatabaseStorage implements IStorage {
       completedRides: ridesWithUserData as any[],
       soloActivities,
     };
+  }
+
+  // Organizer GPX operations
+  async createOrganizerGpx(gpxFile: InsertOrganizerGpxFile): Promise<OrganizerGpxFile> {
+    const [newGpx] = await db
+      .insert(organizerGpxFiles)
+      .values(gpxFile)
+      .returning();
+    return newGpx;
+  }
+
+  async getOrganizerGpx(rideId: number): Promise<OrganizerGpxFile | undefined> {
+    const [gpx] = await db
+      .select()
+      .from(organizerGpxFiles)
+      .where(eq(organizerGpxFiles.rideId, rideId))
+      .limit(1);
+    return gpx || undefined;
+  }
+
+  async getOrganizerGpxById(id: number): Promise<OrganizerGpxFile | undefined> {
+    const [gpx] = await db
+      .select()
+      .from(organizerGpxFiles)
+      .where(eq(organizerGpxFiles.id, id))
+      .limit(1);
+    return gpx || undefined;
+  }
+
+  async linkOrganizerGpx(rideId: number, gpxId: number, isManual: boolean): Promise<void> {
+    await db
+      .update(organizerGpxFiles)
+      .set({ 
+        rideId,
+        isManuallyLinked: isManual,
+        linkedAt: new Date()
+      })
+      .where(eq(organizerGpxFiles.id, gpxId));
+  }
+
+  async updateOrganizerGpx(id: number, updates: Partial<OrganizerGpxFile>): Promise<void> {
+    await db
+      .update(organizerGpxFiles)
+      .set(updates)
+      .where(eq(organizerGpxFiles.id, id));
+  }
+
+  // Participant proximity matching operations
+  async createParticipantMatch(match: InsertParticipantMatch): Promise<ParticipantMatch> {
+    const [newMatch] = await db
+      .insert(participantMatches)
+      .values(match)
+      .returning();
+    return newMatch;
+  }
+
+  async getParticipantMatches(rideId: number): Promise<ParticipantMatch[]> {
+    return await db
+      .select()
+      .from(participantMatches)
+      .where(eq(participantMatches.rideId, rideId))
+      .orderBy(desc(participantMatches.matchedAt));
+  }
+
+  async getParticipantMatch(rideId: number, participantId: number): Promise<ParticipantMatch | undefined> {
+    const [match] = await db
+      .select()
+      .from(participantMatches)
+      .where(
+        and(
+          eq(participantMatches.rideId, rideId),
+          eq(participantMatches.participantId, participantId)
+        )
+      )
+      .limit(1);
+    return match || undefined;
+  }
+
+  async updateParticipantMatch(id: number, updates: Partial<ParticipantMatch>): Promise<void> {
+    await db
+      .update(participantMatches)
+      .set(updates)
+      .where(eq(participantMatches.id, id));
+  }
+
+  // Advanced matching operations
+  async getOrganizerPlannedRides(organizerId: number, dateFilter?: Date): Promise<Array<Ride & { organizerName: string }>> {
+    let query = db
+      .select({
+        id: rides.id,
+        name: rides.name,
+        description: rides.description,
+        dateTime: rides.dateTime,
+        rideType: rides.rideType,
+        surfaceType: rides.surfaceType,
+        gpxFilePath: rides.gpxFilePath,
+        meetupLocation: rides.meetupLocation,
+        meetupCoords: rides.meetupCoords,
+        organizerId: rides.organizerId,
+        isCompleted: rides.isCompleted,
+        completedAt: rides.completedAt,
+        createdAt: rides.createdAt,
+        weatherData: rides.weatherData,
+        organizerName: users.name,
+      })
+      .from(rides)
+      .leftJoin(users, eq(rides.organizerId, users.id))
+      .where(eq(rides.organizerId, organizerId));
+
+    if (dateFilter) {
+      const startOfDay = new Date(dateFilter);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(dateFilter);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      query = query.where(
+        and(
+          eq(rides.organizerId, organizerId),
+          sql`${rides.dateTime} >= ${startOfDay}`,
+          sql`${rides.dateTime} <= ${endOfDay}`
+        )
+      );
+    }
+
+    const results = await query.orderBy(asc(rides.dateTime));
+    
+    return results.map(row => ({
+      ...row,
+      organizerName: row.organizerName || 'Unknown',
+    }));
+  }
+
+  async getRideParticipantIds(rideId: number): Promise<number[]> {
+    const participants = await db
+      .select({ userId: rideParticipants.userId })
+      .from(rideParticipants)
+      .where(eq(rideParticipants.rideId, rideId));
+    
+    return participants.map(p => p.userId);
+  }
+
+  async getPendingParticipantGpxFiles(rideId: number, participantIds: number[]): Promise<Array<{
+    userId: number;
+    gpxFilePath: string;
+    activityDate: Date;
+  }>> {
+    // Get solo activities from participants that might match this ride
+    const activities = await db
+      .select({
+        userId: soloActivities.userId,
+        gpxFilePath: soloActivities.gpxFilePath,
+        activityDate: soloActivities.completedAt,
+      })
+      .from(soloActivities)
+      .where(sql`${soloActivities.userId} = ANY(${participantIds})`);
+    
+    return activities;
+  }
+
+  async getOrganizerPlannedRides(organizerId: number, date: Date): Promise<Array<Ride>> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get organizer's rides for the date that are NOT completed yet
+    return await db.select()
+      .from(rides)
+      .where(
+        and(
+          eq(rides.organizerId, organizerId),
+          eq(rides.isCompleted, false), // Only show non-completed rides
+          sql`${rides.dateTime} >= ${startOfDay} AND ${rides.dateTime} <= ${endOfDay}`
+        )
+      );
+  }
+
+  async getOrganizerGpxForRide(rideId: number): Promise<OrganizerGpxFile | undefined> {
+    const [organizerGpx] = await db
+      .select()
+      .from(organizerGpxFiles)
+      .where(eq(organizerGpxFiles.rideId, rideId))
+      .limit(1);
+    
+    return organizerGpx;
   }
 }
 

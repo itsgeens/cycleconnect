@@ -64,6 +64,53 @@ export const soloActivities = pgTable("solo_activities", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Table for organizer GPX files linked to planned rides
+export const organizerGpxFiles = pgTable("organizer_gpx_files", {
+  id: serial("id").primaryKey(),
+  rideId: integer("ride_id").references(() => rides.id).notNull().unique(), // One GPX per ride
+  organizerId: integer("organizer_id").references(() => users.id).notNull(),
+  gpxFilePath: text("gpx_file_path").notNull(),
+  originalGpxPath: text("original_gpx_path"), // Backup of original planned route
+  matchScore: decimal("match_score", { precision: 5, scale: 2 }), // Auto-match confidence score
+  isManuallyLinked: boolean("is_manually_linked").default(false), // Manual override flag
+  distance: decimal("distance", { precision: 10, scale: 2 }),
+  duration: integer("duration"),
+  movingTime: integer("moving_time"),
+  elevationGain: decimal("elevation_gain", { precision: 10, scale: 2 }),
+  averageSpeed: decimal("average_speed", { precision: 10, scale: 2 }),
+  averageHeartRate: integer("average_heart_rate"),
+  maxHeartRate: integer("max_heart_rate"),
+  calories: integer("calories"),
+  linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table for participant proximity matches to organizer's actual ride
+export const participantMatches = pgTable("participant_matches", {
+  id: serial("id").primaryKey(),
+  rideId: integer("ride_id").references(() => rides.id).notNull(),
+  participantId: integer("participant_id").references(() => users.id).notNull(),
+  organizerGpxId: integer("organizer_gpx_id").references(() => organizerGpxFiles.id).notNull(),
+  participantGpxPath: text("participant_gpx_path").notNull(),
+  proximityScore: decimal("proximity_score", { precision: 5, scale: 2 }), // % time near organizer
+  matchedPoints: integer("matched_points"), // Number of points within proximity
+  totalOrganizerPoints: integer("total_organizer_points"), // Total organizer track points
+  isCompleted: boolean("is_completed").default(false), // Met 80% threshold
+  distance: decimal("distance", { precision: 10, scale: 2 }),
+  duration: integer("duration"),
+  movingTime: integer("moving_time"),
+  elevationGain: decimal("elevation_gain", { precision: 10, scale: 2 }),
+  averageSpeed: decimal("average_speed", { precision: 10, scale: 2 }),
+  averageHeartRate: integer("average_heart_rate"),
+  maxHeartRate: integer("max_heart_rate"),
+  calories: integer("calories"),
+  matchedAt: timestamp("matched_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => ({
+  // Ensure one match record per participant per ride
+  participantRideUnique: unique().on(table.rideId, table.participantId),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   organizedRides: many(rides),
   rideParticipations: many(rideParticipants),
@@ -111,6 +158,33 @@ export const soloActivitiesRelations = relations(soloActivities, ({ one }) => ({
   }),
 }));
 
+export const organizerGpxFilesRelations = relations(organizerGpxFiles, ({ one, many }) => ({
+  ride: one(rides, {
+    fields: [organizerGpxFiles.rideId],
+    references: [rides.id],
+  }),
+  organizer: one(users, {
+    fields: [organizerGpxFiles.organizerId],
+    references: [users.id],
+  }),
+  participantMatches: many(participantMatches),
+}));
+
+export const participantMatchesRelations = relations(participantMatches, ({ one }) => ({
+  ride: one(rides, {
+    fields: [participantMatches.rideId],
+    references: [rides.id],
+  }),
+  participant: one(users, {
+    fields: [participantMatches.participantId],
+    references: [users.id],
+  }),
+  organizerGpx: one(organizerGpxFiles, {
+    fields: [participantMatches.organizerGpxId],
+    references: [organizerGpxFiles.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
@@ -121,6 +195,30 @@ export const insertUserSchema = createInsertSchema(users).pick({
 export const loginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
+});
+
+// Export new table types
+export type OrganizerGpxFile = typeof organizerGpxFiles.$inferSelect;
+export type InsertOrganizerGpxFile = typeof organizerGpxFiles.$inferInsert;
+export type ParticipantMatch = typeof participantMatches.$inferSelect;
+export type InsertParticipantMatch = typeof participantMatches.$inferInsert;
+
+// Insert schemas for new tables
+export const insertOrganizerGpxFileSchema = createInsertSchema(organizerGpxFiles).omit({
+  id: true,
+  linkedAt: true,
+  createdAt: true,
+});
+
+export const insertParticipantMatchSchema = createInsertSchema(participantMatches).omit({
+  id: true,
+  matchedAt: true,
+  createdAt: true,
+});
+
+// Manual link schema for API endpoint
+export const linkGpxSchema = z.object({
+  gpxId: z.string(),
 });
 
 export const insertRideSchema = createInsertSchema(rides).pick({

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Upload, FileText, AlertCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle, Clock, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,20 +16,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Navbar from "@/components/navbar";
+
+interface OrganizerPromptData {
+  type: 'organizer_manual_prompt';
+  message: string;
+  gpxData: {
+    distance: number;
+    duration: number;
+    movingTime: number;
+    elevationGain: number;
+  };
+  plannedRides: Array<{
+    id: number;
+    name: string;
+    dateTime: string;
+    description: string;
+  }>;
+  tempFilePath: string;
+}
 
 export default function UploadActivityPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [showNoMatchModal, setShowNoMatchModal] = useState(false);
-  const [uploadedActivityData, setUploadedActivityData] = useState<any>(null);
+  const [showOrganizerPrompt, setShowOrganizerPrompt] = useState(false);
+  const [organizerPromptData, setOrganizerPromptData] = useState<OrganizerPromptData | null>(null);
+  const [isLinking, setIsLinking] = useState(false);
   const { toast } = useToast();
   const [, navigate] = useLocation();
-
-  // Get planned activities to check for matches
-  const { data: myRides } = useQuery({
-    queryKey: ["/api/my-rides"],
-  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -67,7 +82,16 @@ export default function UploadActivityPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data.matchedRide) {
+      if (data.type === 'organizer_auto_matched') {
+        toast({
+          title: "Activity uploaded successfully!",
+          description: `Automatically matched to your organized ride: ${data.rideName}`,
+        });
+        navigate("/activities");
+      } else if (data.type === 'organizer_manual_prompt') {
+        setOrganizerPromptData(data);
+        setShowOrganizerPrompt(true);
+      } else if (data.matchedRide) {
         toast({
           title: "Activity uploaded successfully!",
           description: `Matched with planned ride: ${data.matchedRide.name}`,
@@ -76,14 +100,11 @@ export default function UploadActivityPage() {
       } else if (data.soloActivity) {
         toast({
           title: "Solo activity created!",
-          description: "Your activity has been saved.",
+          description: "Your GPX file has been uploaded as a solo activity.",
         });
         navigate("/activities");
-      } else {
-        // Fallback for old response format
-        setUploadedActivityData(data.activityData);
-        setShowNoMatchModal(true);
       }
+      setIsUploading(false);
     },
     onError: (error: any) => {
       toast({
@@ -91,165 +112,243 @@ export default function UploadActivityPage() {
         description: error.message || "Please try again.",
         variant: "destructive",
       });
+      setIsUploading(false);
     },
   });
 
-  const createSoloActivityMutation = useMutation({
-    mutationFn: (activityData: any) => apiRequest('POST', '/api/solo-activities', activityData),
-    onSuccess: () => {
-      toast({
-        title: "Solo activity created!",
-        description: "Your activity has been saved.",
+  const linkOrganizerGpxMutation = useMutation({
+    mutationFn: async ({ rideId, tempFilePath, gpxData }: { 
+      rideId: number; 
+      tempFilePath: string; 
+      gpxData: any; 
+    }) => {
+      const response = await apiRequest('/api/link-organizer-gpx', {
+        method: 'POST',
+        data: { rideId, tempFilePath, gpxData }
       });
-      setShowNoMatchModal(false);
-      setUploadedActivityData(null);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "GPX linked successfully!",
+        description: `Linked to your organized ride: ${data.rideName}`,
+      });
+      setShowOrganizerPrompt(false);
+      setOrganizerPromptData(null);
       navigate("/activities");
+      setIsLinking(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to create solo activity",
+        title: "Linking failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
+      setIsLinking(false);
     },
   });
 
   const handleUpload = () => {
-    if (!file) {
-      toast({
-        title: "No file selected",
-        description: "Please select a GPX file to upload",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!file) return;
+    setIsUploading(true);
     uploadActivityMutation.mutate(file);
   };
 
-  const handleCreateSoloActivity = () => {
-    if (uploadedActivityData) {
-      // Send the activity data as-is, the schema will handle date conversion
-      createSoloActivityMutation.mutate(uploadedActivityData);
-    }
+  const handleLinkToRide = (rideId: number) => {
+    if (!organizerPromptData) return;
+    setIsLinking(true);
+    linkOrganizerGpxMutation.mutate({
+      rideId,
+      tempFilePath: organizerPromptData.tempFilePath,
+      gpxData: organizerPromptData.gpxData,
+    });
   };
 
-  const handleCancelUpload = () => {
-    setShowNoMatchModal(false);
-    setUploadedActivityData(null);
-    setFile(null);
+  const handleUploadAsSolo = () => {
+    if (!file) return;
+    setIsUploading(true);
+    
+    const formData = new FormData();
+    formData.append("gpx", file);
+    formData.append("isOrganizerOverride", "true");
+    
+    fetch("/api/upload-activity", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${localStorage.getItem("sessionId") || ""}`,
+      },
+      body: formData,
+    })
+    .then(response => response.json())
+    .then(data => {
+      toast({
+        title: "Solo activity created!",
+        description: "Your GPX file has been uploaded as a solo activity.",
+      });
+      setShowOrganizerPrompt(false);
+      setOrganizerPromptData(null);
+      navigate("/activities");
+    })
+    .catch(error => {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    })
+    .finally(() => {
+      setIsUploading(false);
+    });
+  };
+
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Upload Activity</h1>
-          <p className="text-gray-600 max-w-2xl">
-            Upload your GPX file to track your cycling activity. We'll automatically try to match it with your planned rides.
-          </p>
-        </div>
-
-        <Card className="max-w-2xl">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5" />
-              Upload GPX File
+              Upload Activity
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="gpx-file">Select GPX File</Label>
-              <Input
-                id="gpx-file"
-                type="file"
-                accept=".gpx,application/gpx+xml"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-              {file && (
-                <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
-                  <FileText className="w-4 h-4" />
-                  <span>{file.name}</span>
-                  <span className="text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
-                </div>
+            <div>
+              <Label htmlFor="gpx-file">GPX File</Label>
+              <div className="mt-2">
+                <Input
+                  id="gpx-file"
+                  type="file"
+                  accept=".gpx,application/gpx+xml"
+                  onChange={handleFileChange}
+                  className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+            </div>
+
+            {file && (
+              <Alert>
+                <FileText className="h-4 w-4" />
+                <AlertDescription>
+                  Ready to upload: <strong>{file.name}</strong> ({(file.size / 1024).toFixed(1)} KB)
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button 
+              onClick={handleUpload} 
+              disabled={!file || isUploading}
+              className="w-full"
+            >
+              {isUploading ? (
+                <>
+                  <Clock className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Activity
+                </>
               )}
-            </div>
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-900 mb-2">How it works:</h3>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• We'll check if your activity matches any past planned rides (85% similarity)</li>
-                <li>• If matched, it will be marked as completed automatically</li>
-                <li>• If no match, you can save it as a solo activity</li>
-              </ul>
-            </div>
-
-            <div className="flex gap-4">
-              <Button 
-                onClick={handleUpload} 
-                disabled={!file || uploadActivityMutation.isPending}
-                className="flex-1"
-              >
-                {uploadActivityMutation.isPending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Activity
-                  </>
-                )}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate("/activities")}
-                disabled={uploadActivityMutation.isPending}
-              >
-                Cancel
-              </Button>
-            </div>
+            </Button>
           </CardContent>
         </Card>
-
-        {/* No Match Modal */}
-        <Dialog open={showNoMatchModal} onOpenChange={setShowNoMatchModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-amber-500" />
-                No Matching Planned Activity
-              </DialogTitle>
-              <DialogDescription>
-                Your uploaded activity doesn't match any of your planned rides (85% similarity threshold). 
-                Would you like to save it as a solo activity instead?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={handleCancelUpload}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleCreateSoloActivity}
-                disabled={createSoloActivityMutation.isPending}
-              >
-                {createSoloActivityMutation.isPending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creating...
-                  </>
-                ) : (
-                  "Upload Solo Activity"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Organizer Prompt Dialog */}
+      <Dialog open={showOrganizerPrompt} onOpenChange={setShowOrganizerPrompt}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Link to Organized Ride?
+            </DialogTitle>
+            <DialogDescription>
+              I noticed you organized a ride today. Would you like this GPX file to serve as the actual route for your planned ride?
+            </DialogDescription>
+          </DialogHeader>
+
+          {organizerPromptData && (
+            <div className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Your Activity Data:</strong><br />
+                  Distance: {organizerPromptData.gpxData.distance?.toFixed(1)} km | 
+                  Duration: {formatDuration(organizerPromptData.gpxData.duration)} | 
+                  Elevation: {organizerPromptData.gpxData.elevationGain?.toFixed(0)}m
+                </AlertDescription>
+              </Alert>
+
+              <div>
+                <h4 className="font-medium mb-3">Your Organized Rides Today:</h4>
+                <div className="space-y-2">
+                  {organizerPromptData.plannedRides.map((ride) => (
+                    <Card key={ride.id} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h5 className="font-medium">{ride.name}</h5>
+                          <p className="text-sm text-gray-600">{ride.description}</p>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            {formatDate(ride.dateTime)}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleLinkToRide(ride.id)}
+                          disabled={isLinking}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {isLinking ? (
+                            <>
+                              <Clock className="w-3 h-3 mr-1 animate-spin" />
+                              Linking...
+                            </>
+                          ) : (
+                            'Link This Ride'
+                          )}
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleUploadAsSolo}
+              disabled={isUploading}
+            >
+              Upload as Solo Activity
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -437,10 +437,25 @@ export default function RideDetail() {
             <CardContent>
               <GPXMapPreview
                 gpxUrl={ride.gpxFilePath}
+                secondaryGpxUrl={(ride as any)?.organizerGpxPath || undefined}
                 className="h-96"
                 interactive={true}
                 showFullscreen={true}
               />
+              {(ride as any)?.organizerGpxPath && (
+                <div className="mt-3 text-sm text-gray-600">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                      <span>Planned Route</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded"></div>
+                      <span>Organizer's Actual Route</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

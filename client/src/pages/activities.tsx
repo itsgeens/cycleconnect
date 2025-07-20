@@ -287,7 +287,7 @@ export default function Activities() {
                 <div className="space-y-4">
                   {filteredCompletedActivities.map((activity: any) => (
                     <ActivityCard
-                      key={activity.id}
+                      key={activity.gpxFilePath && !activity.organizerId ? `solo-${activity.id}` : `group-${activity.id}`}
                       activity={activity}
                       type={activity.gpxFilePath && !activity.organizerId ? 'solo' : 'group'}
                     />

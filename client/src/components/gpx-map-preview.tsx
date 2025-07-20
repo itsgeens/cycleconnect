@@ -35,6 +35,13 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       touchZoom: interactive,
     }).setView([37.7749, -122.4194], 13);
 
+    // Create custom panes for proper layering
+    map.createPane('plannedRoute');
+    map.getPane('plannedRoute')!.style.zIndex = '400';
+    
+    map.createPane('actualRoute');
+    map.getPane('actualRoute')!.style.zIndex = '450';
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
@@ -77,19 +84,19 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         }
       }
 
-      // Display primary route (user's route) in green
+      // Display primary route in blue (planned route)
       if (gpxContent) {
         const stats = parseGPXData(gpxContent);
         if (stats.coordinates.length > 0) {
-          displayGPXRoute(map, stats.coordinates, '#22c55e', 'My Route');
+          displayGPXRoute(map, stats.coordinates, '#3b82f6', 'Planned Route');
         }
       }
 
-      // Display secondary route (organizer's route) in blue
+      // Display secondary route in green (organizer's actual route)
       if (secondaryGpxContent) {
         const secondaryStats = parseGPXData(secondaryGpxContent);
         if (secondaryStats.coordinates.length > 0) {
-          displayGPXRoute(map, secondaryStats.coordinates, '#3b82f6', 'Planned Route');
+          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer\'s Actual Route');
         }
       }
     };
@@ -171,11 +178,15 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   const displayGPXRoute = (map: L.Map, coordinates: [number, number][], color: string = '#3b82f6', label?: string) => {
     if (coordinates.length === 0) return;
 
-    // Create route polyline
+    // Determine if this is the organizer's actual route (green) or planned route (blue)
+    const isOrganizerRoute = color === '#22c55e';
+    
+    // Create route polyline with appropriate z-index
     const polyline = L.polyline(coordinates, {
       color: color,
-      weight: 3,
-      opacity: 0.8
+      weight: isOrganizerRoute ? 4 : 3, // Thicker line for organizer's route
+      opacity: isOrganizerRoute ? 0.9 : 0.7, // More opaque for organizer's route
+      pane: isOrganizerRoute ? 'actualRoute' : 'plannedRoute' // Higher pane for organizer's route
     }).addTo(map);
 
     // Store layer for cleanup
