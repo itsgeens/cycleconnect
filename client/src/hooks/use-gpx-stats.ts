@@ -24,9 +24,14 @@ export function useGPXStats(gpxUrl?: string) {
       setError(null);
 
       try {
-        const response = await fetch(gpxUrl);
+        // Handle both absolute and relative URLs
+        // In production, we need to ensure GPX files are requested from the correct base URL
+        const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+        const fullGpxUrl = gpxUrl.startsWith('http') ? gpxUrl : `${API_BASE_URL}${gpxUrl}`;
+        
+        const response = await fetch(fullGpxUrl);
         if (!response.ok) {
-          throw new Error('Failed to fetch GPX file');
+          throw new Error(`Failed to fetch GPX file: ${response.status} ${response.statusText}`);
         }
 
         const gpxContent = await response.text();

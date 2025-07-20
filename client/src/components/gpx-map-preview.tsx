@@ -47,7 +47,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       
       if (gpxUrl && !gpxContent) {
         try {
-          const response = await fetch(gpxUrl);
+          // Handle both absolute and relative URLs
+          const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+          const fullGpxUrl = gpxUrl.startsWith('http') ? gpxUrl : `${API_BASE_URL}${gpxUrl}`;
+          
+          const response = await fetch(fullGpxUrl);
           if (response.ok) {
             gpxContent = await response.text();
           }
@@ -60,7 +64,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       let secondaryGpxContent = '';
       if (secondaryGpxUrl) {
         try {
-          const response = await fetch(secondaryGpxUrl);
+          // Handle both absolute and relative URLs
+          const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+          const fullSecondaryUrl = secondaryGpxUrl.startsWith('http') ? secondaryGpxUrl : `${API_BASE_URL}${secondaryGpxUrl}`;
+          
+          const response = await fetch(fullSecondaryUrl);
           if (response.ok) {
             secondaryGpxContent = await response.text();
           }
