@@ -1,0 +1,25 @@
+{
+  "name": "CycleConnect",
+  "description": "Cycling community platform for group rides and activity tracking",
+  "repository": "https://github.com/yourusername/cycleconnect",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "cycling", "community", "react"],
+  "env": {
+    "DATABASE_URL": {
+      "description": "PostgreSQL database URL from Supabase",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Random string for session encryption",
+      "generator": "secret"
+    },
+    "NODE_ENV": {
+      "value": "production"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}

@@ -28,7 +28,11 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(url, {
+  // Get the API base URL from environment or default to relative URLs
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  
+  const res = await fetch(fullUrl, {
     method: options.method,
     headers,
     body: options.data ? JSON.stringify(options.data) : undefined,
@@ -67,7 +71,11 @@ export const getQueryFn: <T>(options: {
       url += `?${params.toString()}`;
     }
 
-    const res = await fetch(url, {
+    // Get the API base URL from environment or default to relative URLs
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    
+    const res = await fetch(fullUrl, {
       headers,
       credentials: "include",
     });
