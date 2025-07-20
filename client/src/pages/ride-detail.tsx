@@ -13,7 +13,7 @@ import { authManager } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import GPXMapPreview from "@/components/gpx-map-preview";
 import LeaveRideModal from "@/components/leave-ride-modal";
-import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle, Upload, TrendingUp } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Users, Calendar, MapPin, Mountain, Route, User, CheckCircle, Upload, TrendingUp, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
@@ -183,6 +183,44 @@ export default function RideDetail() {
     onError: (error: any) => {
       toast({
         title: "Failed to upload activity",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const followMutation = useMutation({
+    mutationFn: (userId: number) => apiRequest(`/api/users/${userId}/follow`, { method: 'POST' }),
+    onSuccess: () => {
+      toast({
+        title: "Followed user",
+        description: "You're now following this rider.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-stats'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to follow",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: (userId: number) => apiRequest(`/api/users/${userId}/unfollow`, { method: 'POST' }),
+    onSuccess: () => {
+      toast({
+        title: "Unfollowed user",
+        description: "You're no longer following this rider.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/rides', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/my-stats'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to unfollow",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -500,13 +538,37 @@ export default function RideDetail() {
             <CardContent>
               <div className="space-y-2">
                 {ride.participants?.map((participant) => (
-                  <div key={participant.id} className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-cycling-blue rounded-full flex items-center justify-center text-white text-sm font-medium">
-                      {participant.name.charAt(0).toUpperCase()}
+                  <div key={participant.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer flex-1"
+                      onClick={() => navigate(`/stats/${participant.id}`)}
+                    >
+                      <div className="w-8 h-8 bg-cycling-blue rounded-full flex items-center justify-center text-white text-sm font-medium">
+                        {participant.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm hover:text-cycling-blue transition-colors">{participant.name}</span>
+                      {participant.id === ride.organizerId && (
+                        <Badge variant="secondary" className="text-xs">Organizer</Badge>
+                      )}
                     </div>
-                    <span className="text-sm">{participant.name}</span>
-                    {participant.id === ride.organizerId && (
-                      <Badge variant="secondary" className="text-xs">Organizer</Badge>
+                    {user?.id !== participant.id && (
+                      <Button
+                        size="sm"
+                        variant={(participant as any).isFollowing ? "outline" : "default"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if ((participant as any).isFollowing) {
+                            unfollowMutation.mutate(participant.id);
+                          } else {
+                            followMutation.mutate(participant.id);
+                          }
+                        }}
+                        disabled={followMutation.isPending || unfollowMutation.isPending}
+                        className="ml-2"
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        {(participant as any).isFollowing ? "Following" : "Follow"}
+                      </Button>
                     )}
                   </div>
                 ))}

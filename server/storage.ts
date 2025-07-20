@@ -127,9 +127,7 @@ export class DatabaseStorage implements IStorage {
     return ride;
   }
 
-  async deleteRide(id: number): Promise<void> {
-    await db.delete(rides).where(eq(rides.id, id));
-  }
+
 
   async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>> {
     // Build the conditions array

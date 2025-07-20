@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ride not found" });
       }
       
-      // If user is authenticated, include their activity data for this ride
+      // If user is authenticated, include their activity data and following status for participants
       const sessionId = req.headers.authorization?.replace("Bearer ", "");
       if (sessionId) {
         const session = sessions.get(sessionId);
@@ -324,8 +324,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get user's activity data for this ride
           const userActivityData = await storage.getUserActivityForRide(rideId, userId);
           
+          // Add following status to participants
+          const participantsWithFollowStatus = await Promise.all(
+            (ride.participants || []).map(async (participant) => {
+              const isFollowing = await storage.isFollowing(userId, participant.id);
+              return {
+                ...participant,
+                isFollowing,
+              };
+            })
+          );
+          
           res.json({
             ...ride,
+            participants: participantsWithFollowStatus,
             userActivityData,
           });
           return;

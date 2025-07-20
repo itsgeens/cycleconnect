@@ -218,19 +218,40 @@ export default function Activities() {
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4">
+            {/* Always show the upload button */}
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate("/upload-activity")}
+                className="flex items-center gap-2"
+              >
+                <Trophy className="w-4 h-4" />
+                Upload Activity
+              </Button>
+            </div>
+
             {allCompletedActivities.length === 0 ? (
               <div className="text-center py-12">
                 <Trophy className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No completed activities</h3>
                 <p className="text-gray-600 mb-4">
-                  Complete your first ride to see your activity history here
+                  Upload your first GPX file or complete a ride to see your activity history here
                 </p>
-                <button
-                  onClick={() => navigate("/")}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Find Rides to Join
-                </button>
+                <div className="flex justify-center gap-4">
+                  <button
+                    onClick={() => navigate("/")}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Find Rides to Join
+                  </button>
+                  <button
+                    onClick={() => navigate("/upload-activity")}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Upload Solo Activity
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -248,16 +269,6 @@ export default function Activities() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => navigate("/upload-activity")}
-                      className="flex items-center gap-2"
-                    >
-                      <Trophy className="w-4 h-4" />
-                      Upload Activity
-                    </Button>
-                    
                     {activitiesWithoutUserData.length > 0 && (
                       <Button
                         variant="outline"
