@@ -84,7 +84,7 @@ function parseGPXData(gpxContent: string): GPXStats {
   const gpxNamespace = 'http://www.topografix.com/GPX/1/1'; // Common GPX 1.1 namespace
     const trackPoints = xmlDoc.getElementsByTagNameNS(gpxNamespace, 'trkpt');
   
-  trackPoints.forEach((point, index) => {
+    Array.from(trackPoints).forEach((point) => { 
     const lat = parseFloat(point.getAttribute('lat') || '0');
     const lon = parseFloat(point.getAttribute('lon') || '0');
     const eleElement = point.getElementsByTagNameNS(gpxNamespace, 'ele')[0];
