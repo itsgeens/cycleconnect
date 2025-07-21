@@ -100,7 +100,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         const secondaryStats = parseGPXData(secondaryGpxContent);
         console.log('Parsed Secondary GPX Stats:', secondaryStats); // Log parsed secondary stats
         if (secondaryStats.coordinates.length > 0) {
-          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer's Actual Route');
+          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer\\\'s Actual Route');
         }
       }
 
