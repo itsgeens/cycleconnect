@@ -90,57 +90,57 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
           //   console.log('leaflet-gpx: Total distance:', gpx.getDistance()); // Distance in meters
           //   console.log('leaflet-gpx: Elevation gain:', gpx.getElevationGain()); // Elevation gain in meters
           // }
-        }).on('loaded', function(e) {
-           const gpx = e.target;
-           console.log(`leaflet-gpx (${label || ''}): Loaded GPX data. Distance: ${gpx.getDistance()}m, Elevation Gain: ${gpx.getElevationGain()}m`);
+        }); // Remove the .on('loaded', ...) here
 
-           // Add label if provided
-           if (label && gpx.getLayers().length > 0) {
-             const layers = gpx.getLayers(); // Get individual layers (e.g., polyline, markers)
-             const polylineLayer = layers.find((layer: L.Layer) => layer instanceof L.Polyline); // Explicitly type layer as L.Layer
-
-             if (polylineLayer) {
-               const coordinates = polylineLayer.getLatLngs(); // Get LatLngs from the polyline
-
-                if (coordinates && coordinates.length > 0) {
-                   const midPoint = coordinates[Math.floor(coordinates.length / 2)];
-                   const labelMarker = L.marker(midPoint, {
-                     icon: L.divIcon({
-                       className: 'route-label',
-                       html: `<div style=\"background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;\">${label}</div>`,
-                       iconSize: [100, 20],
-                       iconAnchor: [50, 10]
-                     })
-                   }).addTo(mapInstanceRef.current!);
-                    layersRef.current.push(labelMarker); // Store label marker for cleanup
-                 }
-             }
-           }
-
-
-            // Fit map to route bounds after both layers are potentially added
-           setTimeout(() => {
-             const bounds = new L.LatLngBounds([]);
-              layersRef.current.forEach(layer => {
-                 if (layer instanceof L.Polyline) { // Only include polylines for bounds calculation
-                    bounds.extend(layer.getBounds());
-                 }
-              });
-
-             if (bounds.isValid()) {
-                mapInstanceRef.current?.fitBounds(bounds, { padding: [50, 50] }); // Increased padding
-             } else {
-                console.warn('leaflet-gpx: Bounds are not valid, cannot fit map.');
-             }
-           }, 200); // Increased delay
-
-
-        }).addTo(mapInstanceRef.current!);
-
+        // Add event listener separately, accessing gpxLayer directly
+        gpxLayer.on('loaded', function() {
+           console.log(`leaflet-gpx (${label || ''}): Loaded GPX data. Distance: ${gpxLayer.get_distance()}m, Elevation Gain: ${gpxLayer.get_elevation_gain()}m`);
+    
+            // Add label if provided
+            if (label && gpxLayer.getLayers().length > 0) { // Use gpxLayer here too
+              const layers = gpxLayer.getLayers(); // Get individual layers
+              const polylineLayer = layers.find((layer: L.Layer) => layer instanceof L.Polyline);
+    
+              if (polylineLayer) {
+                const coordinates = (polylineLayer as L.Polyline).getLatLngs(); // Cast to L.Polyline to access getLatLngs
+    
+                 if (coordinates && coordinates.length > 0) {
+                  const midPoint = coordinates[Math.floor(coordinates.length / 2)] as L.LatLng; // Type assertion
+                    const labelMarker = L.marker(midPoint, {
+                      icon: L.divIcon({
+                        className: 'route-label',
+                        html: `<div style=\"background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;\">${label}</div>`,
+                        iconSize: [100, 20],
+                        iconAnchor: [50, 10]
+                      })
+                    }).addTo(mapInstanceRef.current!);
+                     layersRef.current.push(labelMarker); // Store label marker for cleanup
+                  }
+              }
+            }
+    
+    
+             // Fit map to route bounds after both layers are potentially added
+            setTimeout(() => {
+              const bounds = new L.LatLngBounds([]);
+               layersRef.current.forEach(layer => {
+                  if (layer instanceof L.Polyline) {
+                     bounds.extend((layer as L.Polyline).getBounds()); // Cast for getBounds
+                  }
+               });
+    
+              if (bounds.isValid()) {
+                 mapInstanceRef.current?.fitBounds(bounds, { padding: [50, 50] });
+              } else {
+                 console.warn('leaflet-gpx: Bounds are not valid, cannot fit map.');
+              }
+            }, 200);
+    
+    
+        }); // Add the event listener here
+    
         // Store layer for cleanup
-        layersRef.current.push(gpxLayer);
-      };
-
+        layersRef.current.push(gpxLayer);    
 
       // Load primary GPX
       if (gpxUrl) {
