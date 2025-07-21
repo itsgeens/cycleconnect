@@ -25,29 +25,93 @@ declare global {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configure multer for GPX file uploads
-const storage_multer = multer.diskStorage({
-  destination: (req: any, file: any, cb: any) => {
-    cb(null, path.join(__dirname, "../uploads"));
-  },
-  filename: (req: any, file: any, cb: any) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+import { supabase } from './supabase';
+import { StorageEngine } from 'multer';
+import { Request } from 'express';
+import { File } from 'buffer';
 
-const upload = multer({ 
-  storage: storage_multer,
+class SupabaseStorage implements StorageEngine {
+  _handleFile(
+    req: Request,
+    file: Express.Multer.File,
+    callback: (error?: any, info?: Partial<Express.Multer.File>) => void
+  ): void {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `${file.fieldname}-${uniqueSuffix}.${fileExtension}`;
+    const filePath = `gpx-uploads/${fileName}`; // Define your Supabase bucket and path here
+
+    const fileStream = file.stream;
+    const chunks: any[] = [];
+
+    fileStream.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+
+    fileStream.on('end', async () => {
+      const buffer = Buffer.concat(chunks);
+
+      const { data, error } = await supabase.storage
+        .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+        .upload(filePath, buffer, {
+          contentType: file.mimetype,
+        });
+
+      if (error) {
+        console.error('Supabase upload error:', error);
+        return callback(error);
+      }
+
+      // Return the Supabase file path to be stored in the database
+      callback(null, { path: filePath });
+    });
+
+    fileStream.on('error', (err) => {
+      console.error('File stream error:', err);
+      callback(err);
+    });
+  }
+
+  _removeFile(
+    req: Request,
+    file: Express.Multer.File,
+    callback: (error: Error) => void
+  ): void {
+    const filePath = file.path; // This will be the Supabase storage path
+
+    supabase.storage
+      .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+      .remove([filePath])
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Supabase delete error:', error);
+          return callback(error);
+        }
+        callback(null!);
+      })
+      .catch((err) => {
+        console.error('Supabase delete promise error:', err);
+        callback(err);
+      });
+  }
+}
+
+const supabaseStorage = new SupabaseStorage();
+
+const upload = multer({
+  storage: supabaseStorage, // Use the custom Supabase storage engine
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/gpx+xml" || file.originalname.endsWith(".gpx")) {
+    if (file.mimetype === 'application/gpx+xml' || file.originalname.endsWith('.gpx')) {
       cb(null, true);
     } else {
-      cb(new Error("Only GPX files are allowed"));
+      cb(new Error('Only GPX files are allowed'));
     }
   },
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
-  }
+  },
 });
+
 
 // Initialize services
 const proximityMatcher = new GPXProximityMatcher();
@@ -296,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ride = await storage.createRide({
         ...rideData,
         organizerId: req.userId!,
-        gpxFilePath: `/uploads/${req.file.filename}`,
+        gpxFilePath: req.file.path,
         weatherData,
       });
 
@@ -494,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         deviceId: req.body.deviceId || 'manual',
         routeMatchPercentage: '100.00', // Manually uploaded, assume 100% match
-        gpxFilePath: `/uploads/${req.file.filename}`,
+        gpxFilePath: req.file.path,
         distance: gpxData.distance?.toString(),
         duration: gpxData.duration,
         movingTime: gpxData.movingTime,
@@ -920,7 +984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: `Manual Activity - ${new Date().toLocaleDateString()}`,
           description: `Solo cycling activity uploaded manually`,
           activityType: 'cycling',
-          gpxFilePath: `/uploads/${file.filename}`,
+          gpxFilePath: req.file.path,
           distance: gpxData.distance?.toString(),
           duration: gpxData.duration,
           movingTime: gpxData.movingTime,
@@ -1011,28 +1075,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Serve GPX files for map preview
-  app.get('/api/gpx/:filename', (req, res) => {
+  app.get('/api/gpx/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
-      const filePath = path.resolve(process.cwd(), 'uploads', filename);
-      
-      console.log('Serving GPX file:', filename, 'from path:', filePath);
-      
-      // Check if file exists
-      if (!fs.existsSync(filePath)) {
-        console.error('GPX file not found:', filePath);
-        return res.status(404).json({ message: 'GPX file not found' });
+      const filePath = `gpx-uploads/${filename}`; // Construct the Supabase storage path
+
+      // Generate a signed URL for the file
+      const { data, error } = await supabase.storage
+        .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+        .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour (adjust as needed)
+
+      if (error) {
+        console.error('Supabase create signed URL error:', error);
+        return res.status(500).json({ message: 'Failed to generate GPX file URL' });
       }
-      
-      res.setHeader('Content-Type', 'application/gpx+xml');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.sendFile(filePath);
+
+      // Redirect to the signed URL
+      res.redirect(data.signedUrl);
+
     } catch (error) {
       console.error('GPX file serving error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
+
 
   // Delete solo activity
   app.delete('/api/activities/:id', requireAuth, async (req, res) => {
@@ -1050,17 +1116,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not authorized to delete this activity' });
       }
 
-      // Delete the GPX file if it exists
-      if (activity.gpxFilePath) {
-        try {
-          const filePath = path.resolve(process.cwd(), activity.gpxFilePath);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (fileError) {
-          console.warn('Could not delete GPX file:', fileError);
-        }
-      }
+// Delete the GPX file from Supabase if it exists
+if (activity.gpxFilePath) {
+  try {
+    const { data, error } = await supabase.storage
+      .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+      .remove([activity.gpxFilePath]); // activity.gpxFilePath should already be the Supabase path
+
+    if (error) {
+      console.warn('Could not delete GPX file from Supabase:', error);
+    }
+  } catch (fileError) {
+    console.warn('Supabase delete promise error:', fileError);
+  }
+}
+
 
       // Delete the activity from database
       await storage.deleteSoloActivity(activityId);
