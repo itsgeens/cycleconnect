@@ -10,6 +10,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users } from "lucide-react";
+import { type Ride } from "@shared/schema"; // Import Ride type
+
+// Define the type for myRides data - This should match the return type of storage.getUserRides
+interface MyRidesData {
+  all: Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean }>;
+  organized: Array<Ride & { organizerName: string; participantCount: number }>;
+  joined: Array<Ride & { organizerName: string; participantCount: number }>;
+}
 
 export default function MyRides() {
   const user = authManager.getState().user;
@@ -19,7 +27,7 @@ export default function MyRides() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [selectedRide, setSelectedRide] = useState<any>(null);
 
-  const { data: myRides, isLoading } = useQuery({
+  const { data: myRides, isLoading } = useQuery<MyRidesData>({ // Added type annotation
     queryKey: ["/api/my-rides"],
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache the data (updated property name)
@@ -59,8 +67,8 @@ export default function MyRides() {
   });
 
   const handleLeaveClick = (rideId: number) => {
-    const ride = myRides?.all?.find((r: any) => r.id === rideId) || 
-                 myRides?.joined?.find((r: any) => r.id === rideId) || 
+    const ride = myRides?.all?.find((r: any) => r.id === rideId) ||
+                 myRides?.joined?.find((r: any) => r.id === rideId) ||
                  myRides?.organized?.find((r: any) => r.id === rideId);
     setSelectedRide(ride);
     setShowLeaveModal(true);
@@ -75,7 +83,7 @@ export default function MyRides() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Rides</h1>
@@ -101,17 +109,20 @@ export default function MyRides() {
                   </div>
                 ))
               ) : myRides?.all?.length > 0 ? (
-                myRides.all.map((ride: any) => (
-                  <RideCard 
-                    key={ride.id} 
-                    ride={ride} 
-                    onJoin={() => {}} // No join functionality needed in My Rides
-                    onLeave={handleLeaveClick}
-                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
-                    currentUserId={user?.id}
-                  />
-                ))
+                myRides.all.map((ride: any) => { // Changed to block body
+                  console.log("Ride object being passed to RideCard:", ride); // Added log
+                  return ( // Added explicit return
+                    <RideCard
+                      key={ride.id}
+                      ride={ride}
+                      onJoin={() => {}} // No join functionality needed in My Rides
+                      onLeave={handleLeaveClick}
+                      onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                      isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
+                      currentUserId={user?.id}
+                    />
+                  );
+                })
               ) : (
                 <div className="col-span-full text-center py-12">
                   <Calendar className="mx-auto h-12 w-12 text-gray-400" />
@@ -136,17 +147,20 @@ export default function MyRides() {
                   </div>
                 ))
               ) : myRides?.organized?.length > 0 ? (
-                myRides.organized.map((ride: any) => (
-                  <RideCard 
-                    key={ride.id} 
-                    ride={ride} 
-                    onJoin={() => {}} // No join functionality needed in My Rides
-                    onLeave={handleLeaveClick}
-                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
-                    currentUserId={user?.id}
-                  />
-                ))
+                myRides.organized.map((ride: any) => { // Changed to block body
+                  console.log("Ride object being passed to RideCard:", ride); // Added log
+                  return ( // Added explicit return
+                    <RideCard
+                      key={ride.id}
+                      ride={ride}
+                      onJoin={() => {}} // No join functionality needed in My Rides
+                      onLeave={handleLeaveClick}
+                      onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                      isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
+                      currentUserId={user?.id}
+                    />
+                  );
+                })
               ) : (
                 <div className="col-span-full text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-gray-400" />
@@ -171,17 +185,20 @@ export default function MyRides() {
                   </div>
                 ))
               ) : myRides?.joined?.length > 0 ? (
-                myRides.joined.map((ride: any) => (
-                  <RideCard 
-                    key={ride.id} 
-                    ride={ride} 
-                    onJoin={() => {}} // No join functionality needed in My Rides
-                    onLeave={handleLeaveClick}
-                    onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
-                    isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
-                    currentUserId={user?.id}
-                  />
-                ))
+                myRides.joined.map((ride: any) => {
+                  console.log("Ride object being passed to RideCard:", ride);
+                  return (
+                    <RideCard
+                      key={ride.id}
+                      ride={ride}
+                      onJoin={() => {}} // No join functionality needed in My Rides
+                      onLeave={handleLeaveClick}
+                      onCardClick={(rideId) => navigate(`/ride/${rideId}`)}
+                      isLeaving={leaveRideMutation.isPending && selectedRide?.id === ride.id}
+                      currentUserId={user?.id}
+                    />
+                  );
+                })
               ) : (
                 <div className="col-span-full text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-gray-400" />

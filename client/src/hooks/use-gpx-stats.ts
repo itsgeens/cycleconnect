@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
 
 export interface GPXStats {
   distance: number;
@@ -15,58 +14,59 @@ export function useGPXStats(gpxUrl?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!gpxUrl) { // gpxUrl will now be the Supabase storage path
+    // Use gpxUrl here, as it's the prop received by the hook
+    if (!gpxUrl) {
       setStats(null);
       return;
     }
-
-    const fetchAndParseGPX = async () => {
-      setLoading(true);
-      setError(null);
-
+  
+    console.log("useGPXStats: Fetching GPX from path:", gpxUrl); // Use gpxUrl here
+    const loadStats = async () => {
       try {
-        // Construct the URL to your backend's GPX endpoint
+        // Construct the URL to your backend's GPX endpoint using gpxUrl
         const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-        const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`; // Pass the Supabase storage path as filename
-
-        // Fetch from your backend endpoint (it will handle the redirection to Supabase signed URL)
+        const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`; // Use gpxUrl here
+  
+        // Fetch from your backend endpoint
         const response = await fetch(backendGpxUrl);
-
+  
+        console.log("useGPXStats: Fetch response status:", response.status);
+        console.log("useGPXStats: Fetch response headers:", response.headers);
+  
         if (!response.ok) {
-          // Check if the response is a redirect (status 2xx, but not 200)
-          // In a browser, fetch automatically follows redirects.
-          // If running in a Node.js environment or if fetch doesn't follow redirect automatically,
-          // you might need to handle it manually here by checking response.headers.get('Location')
-          // However, in most browser environments, fetch follows redirects automatically.
            if (response.status >= 400) {
              throw new Error(`Failed to fetch GPX file from backend: ${response.status} ${response.statusText}`);
            }
         }
-
-        // Get the final URL after potential redirects
+  
+        // Get the final URL after potential redirects (though with proxying, this might be your backend URL again)
         const finalGpxUrl = response.url;
-
-        // Fetch the content from the final (signed) URL
-        const gpxResponse = await fetch(finalGpxUrl);
-
+  
+        // Fetch the content from the final URL (which is now your backend proxying endpoint)
+        const gpxResponse = await fetch(finalGpxUrl); // This fetch might be redundant if backend already sent content
+  
          if (!gpxResponse.ok) {
-           throw new Error(`Failed to fetch GPX content from signed URL: ${gpxResponse.status} ${gpxResponse.statusText}`);
+           throw new Error(`Failed to fetch GPX content from URL: ${gpxResponse.status} ${gpxResponse.statusText}`);
          }
-
-
+  
         const gpxContent = await gpxResponse.text();
+        console.log("useGPXStats: Fetched GPX content (first 500 chars):", gpxContent.substring(0, 500));
+  
         const parsedStats = parseGPXData(gpxContent);
+        console.log("useGPXStats: Parsed stats:", parsedStats);
+  
         setStats(parsedStats);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load or parse GPX data');
+      } catch (error) {
+        console.error("useGPXStats: Error fetching or parsing GPX:", error);
         setStats(null);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchAndParseGPX();
-  }, [gpxUrl]);
+    console.log("useGPXStats: Calling loadStats()");
+    loadStats();
+  
+  }, [gpxUrl]); // Use gpxUrl in the dependency array    
 
   return { stats, loading, error };
 }
