@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
     // Removed import GpxJs from 'gpx-js';
-import { type GPXStats } from '../../shared/gpx-types';
+import { type GPXStats } from 'shared/gpx-types';
 
 
     // Keep your calculateDistance function

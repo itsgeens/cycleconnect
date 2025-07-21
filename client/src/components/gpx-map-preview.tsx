@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // Import Leaflet CSS
 import 'leaflet-gpx'; // Import leaflet-gpx
-import { type GPXStats } from '../../shared/gpx-types';
 
 
 // You might still need calculateDistance if leaflet-gpx doesn't provide total distance easily
