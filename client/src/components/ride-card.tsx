@@ -31,7 +31,11 @@ export default function RideCard({
   showLeaveButton = false,
   onLeaveClick
 }: RideCardProps) {
+  console.log('RideCard rendered for ride:', ride.id);
+  console.log('RideCard gpxFilePath:', ride.gpxFilePath);
   const { stats } = useGPXStats(ride.gpxFilePath);
+
+  console.log('RideCard useGPXStats stats:', stats);
   
   // Check if user is a participant - handle both full participants array and boolean flags
   const isParticipant = ride.participants?.some(p => p.id === currentUserId) || 
@@ -67,6 +71,7 @@ export default function RideCard({
     >
       <div className="relative">
         {/* GPX Map Preview */}
+        console.log('RideCard: Attempting to render GPXMapPreview for ride:', ride.id, 'with gpxUrl:', ride.gpxFilePath);
         <GPXMapPreview
           gpxUrl={ride.gpxFilePath}
           className="h-48"
