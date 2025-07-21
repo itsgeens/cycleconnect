@@ -1078,7 +1078,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/gpx/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
-      const filePath = `gpx-uploads/${filename}`; // Construct the Supabase storage path
+      // Use the filename directly as the Supabase storage path
+      const filePath = filename; // MODIFIED: Removed the extra 'gpx-uploads/' prefix
+
+      console.log(`Attempting to generate signed URL for: ${filePath}`); // Add this line for logging
 
       // Generate a signed URL for the file
       const { data, error } = await supabase.storage
@@ -1086,19 +1089,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour (adjust as needed)
 
       if (error) {
-        console.error('Supabase create signed URL error:', error);
-        return res.status(500).json({ message: 'Failed to generate GPX file URL' });
+        console.error('Supabase create signed URL error:', error.message); // Log the specific error message
+        return res.status(500).json({ message: 'Failed to generate GPX file URL', error: error.message }); // Include error message in response
       }
+
+      console.log(`Successfully generated signed URL: ${data.signedUrl}`); // Add this line for logging
 
       // Redirect to the signed URL
       res.redirect(data.signedUrl);
 
-    } catch (error) {
-      console.error('GPX file serving error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+    } catch (error: any) { // Catch any type of error
+      console.error('GPX file serving error:', error.message); // Log the specific error message
+      res.status(500).json({ message: 'Internal server error', error: error.message }); // Include error message in response
     }
   });
-
 
   // Delete solo activity
   app.delete('/api/activities/:id', requireAuth, async (req, res) => {
