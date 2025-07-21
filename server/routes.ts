@@ -495,21 +495,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/rides/:id", requireAuth, async (req, res) => {
     try {
       const rideId = parseInt(req.params.id);
+      console.log(`DELETE request received for ride ID: ${rideId}`); // ADDED LOGGING
+
       const ride = await storage.getRide(rideId);
-      
+      console.log(`Fetched ride for deletion: ${JSON.stringify(ride)}`); // ADDED LOGGING
+
       if (!ride) {
+        console.log(`Ride with ID ${rideId} not found.`); // ADDED LOGGING
         return res.status(404).json({ message: "Ride not found" });
       }
-      
+
       if (ride.organizerId !== req.userId!) {
+        console.log(`User ${req.userId} is not the organizer of ride ${rideId}. Organizer is ${ride.organizerId}.`); // ADDED LOGGING
         return res.status(403).json({ message: "Only the organizer can delete this ride" });
       }
-      
-      await storage.deleteRide(rideId);
+
+      console.log(`Calling storage.deleteRide for ride ID: ${rideId}`); // ADDED LOGGING
+      await storage.deleteRide(rideId); // This is the line that calls the delete logic
+      console.log(`storage.deleteRide completed for ride ID: ${rideId}`); // ADDED LOGGING
+
       res.json({ message: "Ride deleted successfully" });
     } catch (error) {
       console.error("Delete ride error:", error);
-      res.status(500).json({ message: "Internal server error" });
+      // Ensure error message is included in the response
+      res.status(500).json({ message: "Internal server error", error: (error as Error).message });
     }
   });
 
