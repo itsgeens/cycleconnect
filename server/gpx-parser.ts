@@ -51,7 +51,7 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
 
     // Simple XML parsing for GPX files
     // Extract track points
-    const trkptRegex = /<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>([sS]*?)</trkpt>/g;
+    const trkptRegex = /<trkpt[^>]*lat=\"([^\"]+)\"[^>]*lon=\"([^\"]+)\"[^>]*>([\s\S]*?)<\/trkpt>/g;
     let match;
 
     while ((match = trkptRegex.exec(fileContent)) !== null) { // Use fileContent here
