@@ -36,33 +36,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.Layer[]>([]);
 
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    // Initialize map
-    const map = L.map(mapRef.current, {
-      zoomControl: interactive,
-      scrollWheelZoom: interactive,
-      doubleClickZoom: interactive,
-      boxZoom: interactive,
-      keyboard: interactive,
-      dragging: interactive,
-      touchZoom: interactive,
-    }).setView([37.7749, -122.4194], 13);
-
-    // Create custom panes for proper layering
-    map.createPane('plannedRoute');
-    map.getPane('plannedRoute')!.style.zIndex = '400';
-
-    map.createPane('actualRoute');
-    map.getPane('actualRoute')!.style.zIndex = '450';
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    mapInstanceRef.current = map;
-
     // Load and display GPX data
     const loadGPXData = async () => {
       // Function to add a GPX layer to the map
@@ -164,6 +137,33 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
     };
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Initialize map
+    const map = L.map(mapRef.current, {
+      zoomControl: interactive,
+      scrollWheelZoom: interactive,
+      doubleClickZoom: interactive,
+      boxZoom: interactive,
+      keyboard: interactive,
+      dragging: interactive,
+      touchZoom: interactive,
+    }).setView([37.7749, -122.4194], 13);
+
+    // Create custom panes for proper layering
+    map.createPane('plannedRoute');
+    map.getPane('plannedRoute')!.style.zIndex = '400';
+
+    map.createPane('actualRoute');
+    map.getPane('actualRoute')!.style.zIndex = '450';
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    mapInstanceRef.current = map;
+
     loadGPXData();
 
     return () => {
@@ -180,7 +180,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         mapInstanceRef.current = null;
       }
     };
-  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]); // Re-run effect if these change
+  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]; // Re-run effect if these change
 
 
    // Removed parseGPXData function as leaflet-gpx handles parsing for display
@@ -190,15 +190,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
 
   // You might still need calculateDistance if you need it elsewhere or for fallback distance calculation in useGPXStats
-
-
-  if (!gpxData && !gpxUrl) {
-    return (
-      <div className={`${className} bg-gray-100 rounded-lg flex items-center justify-center`}>
-        <p className="text-gray-500 text-sm">No route data available</p>
-      </div>
-    );
-  }
 
   return (
     <div className={`${className} rounded-lg overflow-hidden relative`}>
@@ -212,4 +203,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   );
 }
 
-export { type GPXStats };
+export { type GPXStats }
+
+}
