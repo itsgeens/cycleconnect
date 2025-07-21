@@ -307,52 +307,140 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteRide(rideId: number): Promise<void> {
-    console.log(`Attempting to delete ride with ID: ${rideId}`); // ADDED LOGGING
+    console.log(`Attempting to delete ride with ID: ${rideId}`);
 
     await db.transaction(async (tx) => {
-      console.log(`Starting database transaction for ride deletion: ${rideId}`); // ADDED LOGGING
+      console.log(`Starting database transaction for ride deletion: ${rideId}`);
 
-      // 1. Get the ride details to find the gpxFilePath
-      console.log(`Fetching ride details for deletion: ${rideId}`); // ADDED LOGGING
+      // 1. Get the ride details
+      console.log(`Fetching ride details for deletion: ${rideId}`);
       const [rideToDelete] = await tx.select().from(rides).where(eq(rides.id, rideId)).limit(1);
-      console.log(`Fetched ride details: ${JSON.stringify(rideToDelete)}`); // ADDED LOGGING
+      console.log(`Fetched ride details: ${JSON.stringify(rideToDelete)}`);
 
-      if (rideToDelete && rideToDelete.gpxFilePath) {
-        console.log(`Found GPX file path: ${rideToDelete.gpxFilePath}. Attempting to delete from Supabase.`); // ADDED LOGGING
-        try {
-          // 2. Delete the GPX file from Supabase Storage
-          // Use the Supabase client directly here
-          // Ensure 'supabase' is imported at the top of the file
-          const { data, error } = await supabase.storage
-            .from('gpx-uploads') // Replace with your Supabase bucket name
-            .remove([rideToDelete.gpxFilePath]);
-
-          if (error) {
-            console.error('Supabase delete GPX error:', error);
-            // Log the error, but don't necessarily throw it if the database deletion is more critical
-          } else {
-            console.log(`Successfully deleted GPX file: ${rideToDelete.gpxFilePath}`);
-          }
-        } catch (fileError) {
-          console.error('Error deleting GPX file from Supabase:', fileError);
-          // Log the error
-        }
-      } else {
-        console.log(`No GPX file path found for ride: ${rideId} or ride not found.`); // ADDED LOGGING
+      if (!rideToDelete) {
+        console.log(`Ride with ID ${rideId} not found. Aborting deletion.`);
+        return;
       }
 
-      // First delete all participants associated with the ride
-      console.log(`Deleting participants for ride: ${rideId}`); // ADDED LOGGING
+      // 2. Check for and handle organizer's uploaded GPX file (convert to solo activity if needed)
+      console.log(`Checking for organizer_gpx_files for ride: ${rideId}`);
+      const [organizerGpxToDelete] = await tx.select().from(organizerGpxFiles).where(eq(organizerGpxFiles.rideId, rideId)).limit(1);
+      console.log(`Fetched organizer_gpx_files: ${JSON.stringify(organizerGpxToDelete)}`);
+
+      if (organizerGpxToDelete) {
+        console.log(`Organizer GPX found. Converting to solo activity.`);
+        try {
+          const soloActivityData = {
+            userId: organizerGpxToDelete.organizerId,
+            name: `Former Group Ride: ${rideToDelete.name} (Organizer)`, // Differentiate organizer's solo activity
+            description: `Activity from deleted group ride: ${rideToDelete.name} (Organizer's route)`,
+            activityType: 'cycling', // Assuming cycling
+            gpxFilePath: organizerGpxToDelete.gpxFilePath,
+            distance: organizerGpxToDelete.distance,
+            duration: organizerGpxToDelete.duration,
+            movingTime: organizerGpxToDelete.movingTime,
+            elevationGain: organizerGpxToDelete.elevationGain,
+            averageSpeed: organizerGpxToDelete.averageSpeed,
+            averageHeartRate: organizerGpxToDelete.averageHeartRate,
+            maxHeartRate: organizerGpxToDelete.maxHeartRate,
+            calories: organizerGpxToDelete.calories,
+            completedAt: organizerGpxToDelete.linkedAt || rideToDelete.completedAt || new Date(),
+            deviceName: organizerGpxToDelete.deviceName || 'Converted from Group Ride', // Use original device name if available
+            deviceType: organizerGpxToDelete.deviceType || 'manual', // Use original device type if available
+          };
+
+          console.log(`Creating solo activity from organizer GPX: ${JSON.stringify(soloActivityData)}`);
+          await tx.insert(soloActivities).values(soloActivityData);
+          console.log(`Solo activity created for organizer.`);
+
+          console.log(`Deleting organizer_gpx_files record: ${organizerGpxToDelete.id}`);
+          await tx.delete(organizerGpxFiles).where(eq(organizerGpxFiles.id, organizerGpxToDelete.id));
+          console.log(`Organizer_gpx_files record deleted.`);
+
+        } catch (conversionError) {
+          console.error('Error converting organizer GPX to solo activity:', conversionError);
+          // Log and continue, or handle as appropriate
+        }
+      } else if (rideToDelete.gpxFilePath) {
+         // No organizer_gpx_files record, but there's a planned route GPX file. Delete it from storage.
+         console.log(`No organizer GPX found. Found planned route GPX: ${rideToDelete.gpxFilePath}. Attempting to delete from Supabase.`);
+         try {
+           const { data, error } = await supabase.storage
+             .from('gpx-uploads') // Replace with your Supabase bucket name
+             .remove([rideToDelete.gpxFilePath]);
+
+           if (error) {
+             console.error('Supabase delete planned route GPX error:', error);
+           } else {
+             console.log(`Successfully deleted planned route GPX file: ${rideToDelete.gpxFilePath}`);
+           }
+         } catch (fileError) {
+           console.error('Error deleting planned route GPX file from Supabase:', fileError);
+         }
+      } else {
+        console.log(`No GPX file paths found for ride: ${rideId}`);
+      }
+
+      // 3. Check for and handle participant activity matches (convert to solo activities)
+      console.log(`Checking for activity_matches for ride: ${rideId}`); // ADDED LOGGING
+      const participantActivityMatches = await tx.select().from(activityMatches).where(eq(activityMatches.rideId, rideId));
+      console.log(`Fetched ${participantActivityMatches.length} activity_matches.`); // ADDED LOGGING
+
+
+      for (const activityMatch of participantActivityMatches) {
+        console.log(`Converting activity_match ${activityMatch.id} for user ${activityMatch.userId} to solo activity.`); // ADDED LOGGING
+        try {
+          const soloActivityData = {
+            userId: activityMatch.userId,
+            name: `Former Group Ride: ${rideToDelete.name}`, // You can customize the name
+            description: `Activity from deleted group ride: ${rideToDelete.name}`,
+            activityType: 'cycling', // Assuming cycling
+            gpxFilePath: activityMatch.gpxFilePath, // Use the activity match's GPX path
+            distance: activityMatch.distance,
+            duration: activityMatch.duration,
+            movingTime: activityMatch.movingTime,
+            elevationGain: activityMatch.elevationGain,
+            averageSpeed: activityMatch.averageSpeed,
+            averageHeartRate: activityMatch.averageHeartRate,
+            maxHeartRate: activityMatch.maxHeartRate,
+            calories: activityMatch.calories,
+            completedAt: activityMatch.completedAt || rideToDelete.completedAt || new Date(),
+            deviceName: activityMatch.deviceName || 'Converted from Group Ride',
+            deviceType: activityMatch.deviceType || 'manual',
+          };
+
+          console.log(`Creating solo activity from activity match: ${JSON.stringify(soloActivityData)}`); // ADDED LOGGING
+          await tx.insert(soloActivities).values(soloActivityData);
+          console.log(`Solo activity created for user ${activityMatch.userId}.`); // ADDED LOGGING
+
+          // Delete the activity_match record after converting it
+          console.log(`Deleting activity_match record: ${activityMatch.id}`); // ADDED LOGGING
+          await tx.delete(activityMatches).where(eq(activityMatches.id, activityMatch.id));
+          console.log(`Activity_match record deleted.`); // ADDED LOGGING
+
+
+          // The actual GPX file in storage (activityMatch.gpxFilePath) is NOT deleted here.
+          // It remains in storage and is now linked to the new solo activity.
+
+        } catch (conversionError) {
+          console.error(`Error converting activity match ${activityMatch.id} to solo activity:`, conversionError);
+          // Decide how to handle this error
+        }
+      }
+
+
+      // 4. Delete all participants associated with the ride
+      console.log(`Deleting participants for ride: ${rideId}`);
       await tx.delete(rideParticipants).where(eq(rideParticipants.rideId, rideId));
-      console.log(`Participants deleted for ride: ${rideId}`); // ADDED LOGGING
+      console.log(`Participants deleted for ride: ${rideId}`);
 
 
-      // Then delete the ride record from the database
-      console.log(`Deleting ride record from database: ${rideId}`); // ADDED LOGGING
+      // 5. Then delete the ride record from the database
+      console.log(`Deleting ride record from database: ${rideId}`);
       await tx.delete(rides).where(eq(rides.id, rideId));
-      console.log(`Ride record deleted from database: ${rideId}`); // ADDED LOGGING
+      console.log(`Ride record deleted from database: ${rideId}`);
 
-      console.log(`Database transaction completed for ride deletion: ${rideId}`); // ADDED LOGGING
+      console.log(`Database transaction completed for ride deletion: ${rideId}`);
     });
   }
 
