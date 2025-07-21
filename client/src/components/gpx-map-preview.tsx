@@ -109,13 +109,13 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         setTimeout(() => {
           const allCoordinates = [];
           if (gpxContent) {
-            const primaryStats = parseGPXData(gpxContent);
+            const primaryStats = parseGPXData(gpxContent); // Re-parse to get coordinates for bounds
             if (primaryStats.coordinates.length > 0) {
               allCoordinates.push(...primaryStats.coordinates);
             }
           }
           if (secondaryGpxContent) {
-            const secondaryStats = parseGPXData(secondaryGpxContent);
+            const secondaryStats = parseGPXData(secondaryGpxContent); // Re-parse to get coordinates for bounds
             if (secondaryStats.coordinates.length > 0) {
               allCoordinates.push(...secondaryStats.coordinates);
             }
