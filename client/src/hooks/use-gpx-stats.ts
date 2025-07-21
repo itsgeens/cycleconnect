@@ -81,12 +81,13 @@ function parseGPXData(gpxContent: string): GPXStats {
   let previousElevation: number | null = null;
 
   // Extract track points
-  const trackPoints = xmlDoc.querySelectorAll('trkpt');
+  const gpxNamespace = 'http://www.topografix.com/GPX/1/1'; // Common GPX 1.1 namespace
+    const trackPoints = xmlDoc.getElementsByTagNameNS(gpxNamespace, 'trkpt');
   
   trackPoints.forEach((point, index) => {
     const lat = parseFloat(point.getAttribute('lat') || '0');
     const lon = parseFloat(point.getAttribute('lon') || '0');
-    const eleElement = point.querySelector('ele');
+    const eleElement = point.getElementsByTagNameNS(gpxNamespace, 'ele')[0];
     const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : null;
 
     if (lat && lon) {
