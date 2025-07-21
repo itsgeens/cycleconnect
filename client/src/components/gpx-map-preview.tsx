@@ -149,36 +149,39 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
   const parseGPXData = (gpxContent: string): GPXStats => {
     console.log('Parsing GPX data...'); // Log start of parsing
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
+
     const coordinates: [number, number][] = [];
     let totalDistance = 0;
     let elevationGain = 0;
     let previousElevation: number | null = null; // Use null for initial previousElevation
 
-    // Use a regular expression to find all trkpt elements and extract lat/lon/ele
-    const trkptRegex = /<trkpt lat="(-?\d+\.?\d*)" lon="(-?\d+\.?\d*)">\s*<ele>(-?\d+\.?\d*)<\/ele>/g;
+    // Define the GPX namespace URI (optional, but good for clarity if needed elsewhere)
+    // const gpxNamespace = 'http://www.topografix.com/GPX/1/1'; // You can keep this commented out
 
-    let match;
-    while ((match = trkptRegex.exec(gpxContent)) !== null) {
-      const lat = parseFloat(match[1]);
-      const lon = parseFloat(match[2]);
-      const elevation = parseFloat(match[3]); // Extract elevation
+    // Extract track points using null for the default namespace
+    const trackPoints = xmlDoc.getElementsByTagNameNS(null, 'trkpt'); // Use null here
+
+    console.log('parseGPXData (DOMParser): Number of track points found:', trackPoints.length); // Log number found by DOMParser
+
+    Array.from(trackPoints).forEach((point) => {
+      const lat = parseFloat(point.getAttribute('lat') || '0');
+      const lon = parseFloat(point.getAttribute('lon') || '0');
+      // Use getElementsByTagNameNS with null for child elements in the default namespace
+      const eleElement = point.getElementsByTagNameNS(null, 'ele')[0]; // Use null here
+      const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : null;
 
       if (!isNaN(lat) && !isNaN(lon)) { // Check if parsing was successful
         coordinates.push([lat, lon]);
 
         // Calculate elevation gain
-        if (!isNaN(elevation)) { // Only calculate if elevation is a valid number
-          if (previousElevation !== null && elevation > previousElevation) {
-            elevationGain += elevation - previousElevation;
-          }
-          previousElevation = elevation;
-        } else {
-           // If elevation is not a number, we can't use it for gain calculation
-           // We might want to decide how to handle this - for now, reset previousElevation
-           previousElevation = null;
+        if (elevation !== null && previousElevation !== null && elevation > previousElevation) {
+          elevationGain += elevation - previousElevation;
         }
+        previousElevation = elevation;
       }
-    }
+    });
 
     // Calculate total distance
     for (let i = 1; i < coordinates.length; i++) {
@@ -189,10 +192,9 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       totalDistance += distance;
     }
 
-    console.log('parseGPXData: Number of track points found (regex):', coordinates.length); // Log the number of coordinates found by regex
-    console.log('parseGPXData: Final coordinates array length:', coordinates.length); // Log final coordinates length
-    console.log('parseGPXData: Calculated total distance (km):', totalDistance); // Log total distance
-    console.log('parseGPXData: Calculated elevation gain (m):', elevationGain); // Log elevation gain
+    console.log('parseGPXData (DOMParser): Final coordinates array length:', coordinates.length); // Log final coordinates length
+    console.log('parseGPXData (DOMParser): Calculated total distance (km):', totalDistance); // Log total distance
+    console.log('parseGPXData (DOMParser): Calculated elevation gain (m):', elevationGain); // Log elevation gain
 
 
     return {
@@ -201,7 +203,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       coordinates
     };
   };
-
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in km
@@ -215,6 +216,9 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   };
 
   const displayGPXRoute = (map: L.Map, coordinates: [number, number][], color: string = '#3b82f6', label?: string) => {
+    console.log('displayGPXRoute: Received coordinates:', coordinates); // Add this logger
+    console.log('displayGPXRoute: Number of coordinates received:', coordinates.length); // Add this logger
+
     if (coordinates.length === 0) return;
 
     // Determine if this is the organizer's actual route (green) or planned route (blue)
