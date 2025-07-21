@@ -61,6 +61,8 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
           const response = await fetch(fullGpxUrl);
           if (response.ok) {
             gpxContent = await response.text();
+            console.log('gpx-map-preview: Fetched raw GPX content:', gpxContent); // Add this line
+            console.log('gpx-map-preview: Length of fetched GPX content:', gpxContent.length); // Add this line
           }
         } catch (error) {
           console.error('Failed to load primary GPX file:', error);
@@ -78,6 +80,8 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
           const response = await fetch(fullSecondaryUrl);
           if (response.ok) {
             secondaryGpxContent = await response.text();
+            console.log('gpx-map-preview: Fetched raw Secondary GPX content:', secondaryGpxContent); // Add this line
+            console.log('gpx-map-preview: Length of fetched Secondary GPX content:', secondaryGpxContent.length); // Add this line
           }
         } catch (error) {
           console.error('Failed to load secondary GPX file:', error);
