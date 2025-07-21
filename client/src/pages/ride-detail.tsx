@@ -427,6 +427,8 @@ export default function RideDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
+        jsx
+{/* Route Preview Card */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -435,14 +437,22 @@ export default function RideDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <GPXMapPreview
-                gpxUrl={ride.gpxFilePath}
-                secondaryGpxUrl={(ride as any)?.organizerGpxPath || undefined}
-                className="h-96"
-                interactive={true}
-                showFullscreen={true}
-              />
-              {(ride as any)?.organizerGpxPath && (
+              {!deleteRideMutation.isPending && ride.gpxFilePath && ( // ADDED CONDITIONAL RENDERING
+                <GPXMapPreview
+                  gpxUrl={ride.gpxFilePath}
+                  secondaryGpxUrl={(ride as any)?.organizerGpxPath || undefined}
+                  className="h-96"
+                  interactive={true}
+                  showFullscreen={true}
+                />
+              )}
+              {/* Add a loading indicator or placeholder if needed */}
+              {deleteRideMutation.isPending && (
+                <div className="h-96 flex items-center justify-center text-gray-500">
+                  Deleting ride and route...
+                </div>
+              )}
+              {(ride as any)?.organizerGpxPath && !deleteRideMutation.isPending && ( // Keep this conditional rendering as well
                 <div className="mt-3 text-sm text-gray-600">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -458,7 +468,6 @@ export default function RideDetail() {
               )}
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Description</CardTitle>

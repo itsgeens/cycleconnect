@@ -308,13 +308,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRide(rideId: number): Promise<void> {
     await db.transaction(async (tx) => {
-      // First delete all participants
+      // 1. Get the ride details to find the gpxFilePath
+      const [rideToDelete] = await tx.select().from(rides).where(eq(rides.id, rideId)).limit(1);
+
+      if (rideToDelete && rideToDelete.gpxFilePath) {
+        try {
+          // 2. Delete the GPX file from Supabase Storage
+          // Use the Supabase client directly here
+          const { data, error } = await supabase.storage
+            .from('gpx-uploads') // Replace with your Supabase bucket name
+            .remove([rideToDelete.gpxFilePath]);
+
+          if (error) {
+            console.error('Supabase delete GPX error:', error);
+            // Log the error, but don't necessarily throw it if the database deletion is more critical
+          } else {
+            console.log(`Successfully deleted GPX file: ${rideToDelete.gpxFilePath}`);
+          }
+        } catch (fileError) {
+          console.error('Error deleting GPX file from Supabase:', fileError);
+          // Log the error
+        }
+      }
+
+      // First delete all participants associated with the ride
       await tx.delete(rideParticipants).where(eq(rideParticipants.rideId, rideId));
-      
-      // Then delete the ride
+
+      // Then delete the ride record from the database
       await tx.delete(rides).where(eq(rides.id, rideId));
     });
   }
+
 
   async getUserRides(userId: number): Promise<{
     all: Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean }>;

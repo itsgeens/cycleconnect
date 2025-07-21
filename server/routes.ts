@@ -39,7 +39,8 @@ class SupabaseStorage implements StorageEngine {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const fileExtension = file.originalname.split('.').pop();
     const fileName = `${file.fieldname}-${uniqueSuffix}.${fileExtension}`;
-    const filePath = `gpx-uploads/${fileName}`; // Define your Supabase bucket and path here
+    // MODIFIED: Removed the extra 'gpx-uploads/' prefix
+    const filePath = fileName; 
 
     const fileStream = file.stream;
     const chunks: any[] = [];
@@ -63,7 +64,7 @@ class SupabaseStorage implements StorageEngine {
       }
 
       // Return the Supabase file path to be stored in the database
-      callback(null, { path: filePath });
+      callback(null, { path: filePath }); // This 'path' is the corrected relative path
     });
 
     fileStream.on('error', (err) => {
