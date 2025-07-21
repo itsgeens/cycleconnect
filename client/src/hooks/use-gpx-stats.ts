@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 
 export interface GPXStats {
   distance: number;
@@ -14,7 +15,7 @@ export function useGPXStats(gpxUrl?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!gpxUrl) {
+    if (!gpxUrl) { // gpxUrl will now be the Supabase storage path
       setStats(null);
       return;
     }
@@ -24,21 +25,40 @@ export function useGPXStats(gpxUrl?: string) {
       setError(null);
 
       try {
-        // Handle both absolute and relative URLs
-        // In production, we need to ensure GPX files are requested from the correct base URL
+        // Construct the URL to your backend's GPX endpoint
         const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-        const fullGpxUrl = gpxUrl.startsWith('http') ? gpxUrl : `${API_BASE_URL}${gpxUrl}`;
-        
-        const response = await fetch(fullGpxUrl);
+        const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`; // Pass the Supabase storage path as filename
+
+        // Fetch from your backend endpoint (it will handle the redirection to Supabase signed URL)
+        const response = await fetch(backendGpxUrl);
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch GPX file: ${response.status} ${response.statusText}`);
+          // Check if the response is a redirect (status 2xx, but not 200)
+          // In a browser, fetch automatically follows redirects.
+          // If running in a Node.js environment or if fetch doesn't follow redirect automatically,
+          // you might need to handle it manually here by checking response.headers.get('Location')
+          // However, in most browser environments, fetch follows redirects automatically.
+           if (response.status >= 400) {
+             throw new Error(`Failed to fetch GPX file from backend: ${response.status} ${response.statusText}`);
+           }
         }
 
-        const gpxContent = await response.text();
+        // Get the final URL after potential redirects
+        const finalGpxUrl = response.url;
+
+        // Fetch the content from the final (signed) URL
+        const gpxResponse = await fetch(finalGpxUrl);
+
+         if (!gpxResponse.ok) {
+           throw new Error(`Failed to fetch GPX content from signed URL: ${gpxResponse.status} ${gpxResponse.statusText}`);
+         }
+
+
+        const gpxContent = await gpxResponse.text();
         const parsedStats = parseGPXData(gpxContent);
         setStats(parsedStats);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to parse GPX file');
+        setError(err instanceof Error ? err.message : 'Failed to load or parse GPX data');
         setStats(null);
       } finally {
         setLoading(false);
