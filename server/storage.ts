@@ -155,12 +155,10 @@ export class DatabaseStorage implements IStorage {
     return ride;
   }
 
-
-
   async getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>> {
     // Build the conditions array - only show non-completed rides
     const conditions = [eq(rides.isCompleted, false)];
-    
+
     if (filters?.rideType) {
       conditions.push(eq(rides.rideType, filters.rideType));
     }
@@ -176,7 +174,7 @@ export class DatabaseStorage implements IStorage {
         dateTime: rides.dateTime,
         rideType: rides.rideType,
         surfaceType: rides.surfaceType,
-        gpxFilePath: rides.gpxFilePath,
+        gpxFilePath: rides.gpxFilePath, // gpxFilePath IS being selected here
         meetupLocation: rides.meetupLocation,
         meetupCoords: rides.meetupCoords,
         organizerId: rides.organizerId,
@@ -191,7 +189,12 @@ export class DatabaseStorage implements IStorage {
       .groupBy(rides.id, users.id)
       .orderBy(asc(rides.dateTime));
 
-    // Get participants for each ride
+    // ADDED CHECK: Ensure result is an array
+    if (!Array.isArray(result)) {
+      console.error("Database query for getRides returned non-array result:", result); // Log the unexpected result
+      return []; // Return an empty array to satisfy the type
+    }
+    // Get participants for each ride (This section is not directly relevant to gpxFilePath)
     const ridesWithParticipants = await Promise.all(
       result.map(async (ride) => {
         const participants = await db
@@ -203,6 +206,8 @@ export class DatabaseStorage implements IStorage {
           .innerJoin(users, eq(rideParticipants.userId, users.id))
           .where(eq(rideParticipants.rideId, ride.id));
 
+        console.log(`Ride ID: ${ride.id}, gpxFilePath: ${ride.gpxFilePath}`); // ADDED LOGGING
+
         return {
           ...ride,
           organizerName: ride.organizerName || 'Unknown',
@@ -212,8 +217,10 @@ export class DatabaseStorage implements IStorage {
       })
     );
 
-    return ridesWithParticipants;
+    console.log(`Returning ${ridesWithParticipants.length} rides from storage.getRides`); // ADDED LOGGING
+    return ridesWithParticipants; // Returns the rides including gpxFilePath
   }
+
 
   async getRide(id: number): Promise<(Ride & { organizer?: { name: string }; participants?: Array<{ id: number; name: string }> }) | undefined> {
     const [ride] = await db
