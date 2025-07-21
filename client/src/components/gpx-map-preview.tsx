@@ -35,8 +35,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     const loadGPXData = async () => {
       // Function to add a GPX layer to the map
       const addGpxLayer = (url: string, color: string, pane: string, label?: string) => {
-        if (!mapInstanceRef.current) return;
-
+        console.log(`GPXMapPreview: addGpxLayer called for URL: ${url}`);
+        if (!mapInstanceRef.current){
+          console.log('GPXMapPreview: mapInstanceRef.current is null in addGpxLayer, returning.'); 
+          return;
+          }
         // Use L.GPX from leaflet-gpx
         const gpxLayer = new L.GPX(url, {
           async: true,
@@ -90,6 +93,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     
              // Fit map to route bounds after both layers are potentially added
             setTimeout(() => {
+              console.log('GPXMapPreview: Attempting to fit map bounds.');
               const bounds = new L.LatLngBounds([]);
                layersRef.current.forEach(layer => {
                   if (layer instanceof L.Polyline) {
@@ -133,8 +137,12 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     };
 
   useEffect(() => {
-    if (!mapRef.current) return;
-
+    console.log('GPXMapPreview useEffect running.');
+    if (!mapRef.current) {
+      console.log('GPXMapPreview: mapRef.current is null, returning.')
+      return;
+    }
+    console.log('GPXMapPreview: mapRef.current is available, initializing map.');
     // Initialize map
     const map = L.map(mapRef.current, {
       zoomControl: interactive,
