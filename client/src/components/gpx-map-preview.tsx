@@ -29,6 +29,9 @@ interface GPXMapPreviewProps {
 }
 
 export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, className = "h-48", interactive = false, showFullscreen = false }: GPXMapPreviewProps) {
+  console.log('GPXMapPreview component rendered.');
+  console.log('GPXMapPreview props:', { gpxData, gpxUrl, secondaryGpxUrl, className, interactive, showFullscreen });
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.Layer[]>([]); // To keep track of layers for cleanup
@@ -122,6 +125,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   }; // Closes the addGpxLayer function
     // Fetch and add GPX layers based on provided URLs
     const fetchAndAddGpxLayers = async () => {
+      console.log('GPXMapPreview: fetchAndAddGpxLayers called.');
       const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
       if (gpxUrl) {
