@@ -256,8 +256,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     return R * c; // Returns distance in km
   }
 
-  };
-
   const displayGPXRoute = (map: L.Map, coordinates: [number, number][], color: string = '#3b82f6', label?: string) => {
     console.log('displayGPXRoute: Received coordinates:', coordinates); // Add this logger
     console.log('displayGPXRoute: Number of coordinates received:', coordinates.length); // Add this logger
