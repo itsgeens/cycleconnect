@@ -86,7 +86,9 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
       // Display primary route in blue (planned route)
       if (gpxContent) {
+        console.log('GPX Content:', gpxContent); // Log GPX content
         const stats = parseGPXData(gpxContent);
+        console.log('Parsed GPX Stats:', stats); // Log parsed stats
         if (stats.coordinates.length > 0) {
           displayGPXRoute(map, stats.coordinates, '#3b82f6', 'Planned Route');
         }
@@ -94,10 +96,36 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
       // Display secondary route in green (organizer's actual route)
       if (secondaryGpxContent) {
+        console.log('Secondary GPX Content:', secondaryGpxContent); // Log secondary GPX content
         const secondaryStats = parseGPXData(secondaryGpxContent);
+        console.log('Parsed Secondary GPX Stats:', secondaryStats); // Log parsed secondary stats
         if (secondaryStats.coordinates.length > 0) {
-          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer\'s Actual Route');
+          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer's Actual Route');
         }
+      }
+
+       // Fit map to route bounds with a small delay
+       if ((gpxContent || secondaryGpxContent) && mapInstanceRef.current) {
+        setTimeout(() => {
+          const allCoordinates = [];
+          if (gpxContent) {
+            const primaryStats = parseGPXData(gpxContent);
+            if (primaryStats.coordinates.length > 0) {
+              allCoordinates.push(...primaryStats.coordinates);
+            }
+          }
+          if (secondaryGpxContent) {
+            const secondaryStats = parseGPXData(secondaryGpxContent);
+            if (secondaryStats.coordinates.length > 0) {
+              allCoordinates.push(...secondaryStats.coordinates);
+            }
+          }
+
+          if (allCoordinates.length > 0) {
+            const bounds = L.latLngBounds(allCoordinates);
+            mapInstanceRef.current?.fitBounds(bounds, { padding: [20, 20] });
+          }
+        }, 100);
       }
     };
 
@@ -120,6 +148,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
   }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]);
 
   const parseGPXData = (gpxContent: string): GPXStats => {
+    console.log('Parsing GPX data...'); // Log start of parsing
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
     
@@ -130,12 +159,17 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
     // Extract track points
     const trackPoints = xmlDoc.querySelectorAll('trkpt');
+    console.log('Number of track points found:', trackPoints.length); // Log number of track points
     
     trackPoints.forEach((point, index) => {
       const lat = parseFloat(point.getAttribute('lat') || '0');
       const lon = parseFloat(point.getAttribute('lon') || '0');
       const eleElement = point.querySelector('ele');
       const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : 0;
+
+      if (index < 5) { // Log data for the first 5 track points
+        console.log(`Track point ${index}:`, { lat, lon, elevation });
+      }
 
       if (lat && lon) {
         coordinates.push([lat, lon]);
@@ -156,6 +190,10 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       );
       totalDistance += distance;
     }
+
+    console.log('Final coordinates array length:', coordinates.length); // Log final coordinates length
+    console.log('Calculated total distance (km):', totalDistance); // Log total distance
+    console.log('Calculated elevation gain (m):', elevationGain); // Log elevation gain
 
     return {
       distance: totalDistance,
