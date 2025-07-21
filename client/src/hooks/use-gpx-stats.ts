@@ -85,12 +85,12 @@ function parseGPXData(gpxContent: string): GPXStats {
 
   // Extract track points
   const gpxNamespace = 'http://www.topografix.com/GPX/1/1'; // Common GPX 1.1 namespace
-    const trackPoints = xmlDoc.getElementsByTagNameNS(gpxNamespace, 'trkpt');
+    const trackPoints = xmlDoc.getElementsByTagNameNS(null, 'trkpt'); // Use null here for the default namespace
   
     Array.from(trackPoints).forEach((point) => { 
     const lat = parseFloat(point.getAttribute('lat') || '0');
     const lon = parseFloat(point.getAttribute('lon') || '0');
-    const eleElement = point.getElementsByTagNameNS(gpxNamespace, 'ele')[0];
+    const eleElement = point.getElementsByTagNameNS(null, 'ele')[0]; // Use null here
     const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : null;
 
     if (lat && lon) {
@@ -112,14 +112,19 @@ function parseGPXData(gpxContent: string): GPXStats {
     );
     totalDistance += distance;
   }
-
-  return {
-    distance: Math.round(totalDistance * 100) / 100, // Round to 2 decimal places
-    elevationGain: Math.round(elevationGain),
-    coordinates,
-    startCoords: coordinates.length > 0 ? { lat: coordinates[0][0], lng: coordinates[0][1] } : undefined,
-    endCoords: coordinates.length > 0 ? { lat: coordinates[coordinates.length - 1][0], lng: coordinates[coordinates.length - 1][1] } : undefined
-  };
+    // Add console logs for debugging the parsing process
+      console.log("parseGPXData: Number of track points found:", trackPoints.length);
+      console.log("parseGPXData: Final coordinates array length:", coordinates.length);
+      console.log("parseGPXData: Calculated total distance (km):", totalDistance);
+      console.log("parseGPXData: Calculated elevation gain (m):", elevationGain);
+    return {
+      distance: totalDistance > 0 ? Math.round(totalDistance * 100) / 100 : 0, // Ensure 0 if no points
+      elevationGain: elevationGain > 0 ? Math.round(elevationGain) : 0, // Ensure 0 if no points
+      coordinates,
+      startCoords: coordinates.length > 0 ? { lat: coordinates[0][0], lng: coordinates[0][1] } : undefined,
+      endCoords: coordinates.length > 0 ? { lat: coordinates[coordinates.length - 1][0], lng: coordinates[coordinates.length - 1][1] } : undefined
+    };
+  
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
