@@ -137,29 +137,6 @@ export default function RideCard({
               {ride.meetupLocation || 'Meetup location TBD'}
             </span>
           </div>
-
-          {/* Weather Info */}
-          {ride.weatherData && (
-            <div className="flex items-center gap-2 text-sm">
-              {ride.weatherData.icon?.includes('01') && <Sun className="w-4 h-4 text-yellow-500" />}
-              {ride.weatherData.icon?.includes('02') && <Cloud className="w-4 h-4 text-gray-500" />}
-              {ride.weatherData.icon?.includes('10') && <CloudRain className="w-4 h-4 text-blue-500" />}
-              {!ride.weatherData.icon && <Cloud className="w-4 h-4 text-gray-500" />}
-              <span className="font-medium">{ride.weatherData.temperature}°C</span>
-              <span className="text-gray-600 text-xs">
-                {ride.weatherData.cyclingAssessment?.isGood ? 'Good' : 'Poor'} conditions
-              </span>
-              {ride.weatherData.cyclingAssessment?.score && (
-                <span className={`text-xs px-2 py-1 rounded ${
-                  ride.weatherData.cyclingAssessment.score >= 70 ? 'bg-green-100 text-green-800' :
-                  ride.weatherData.cyclingAssessment.score >= 50 ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {ride.weatherData.cyclingAssessment.score}%
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Join/Leave Button */}
