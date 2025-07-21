@@ -157,33 +157,56 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
   const parseGPXData = (gpxContent: string): GPXStats => {
     console.log('Parsing GPX data...'); // Log start of parsing
+    console.log('parseGPXData: Received gpxContent (first 500 chars):', gpxContent.substring(0, 500)); // Log beginning of content
+    console.log('parseGPXData: Received gpxContent length:', gpxContent.length); // Log length
+
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
+
+    // --- Add Error Checking ---
+    const errorNode = xmlDoc.querySelector('parsererror');
+    if (errorNode) {
+      console.error('parseGPXData: XML Parsing Error:', errorNode.textContent);
+      // Return empty stats if parsing failed
+      return {
+        distance: 0,
+        elevationGain: 0,
+        coordinates: []
+      };
+    }
+    // --- End Error Checking ---
+
 
     const coordinates: [number, number][] = [];
     let totalDistance = 0;
     let elevationGain = 0;
-    let previousElevation: number | null = null; // Use null for initial previousElevation
+    let previousElevation: number | null = null;
 
     // Define the GPX namespace URI (optional, but good for clarity if needed elsewhere)
-    // const gpxNamespace = 'http://www.topografix.com/GPX/1/1'; // You can keep this commented out
+    // const gpxNamespace = 'http://www.topografix.com/GPX/1/1';
 
     // Extract track points using null for the default namespace
     const trackPoints = xmlDoc.getElementsByTagNameNS(null, 'trkpt'); // Use null here
 
-    console.log('parseGPXData (DOMParser): Number of track points found:', trackPoints.length); // Log number found by DOMParser
+    console.log('parseGPXData (DOMParser): Number of track points found:', trackPoints.length);
+
+    // --- Optional: Log first few track points found by DOMParser ---
+    // You can uncomment this block to inspect the found elements
+    // Array.from(trackPoints).slice(0, 5).forEach((point, index) => {
+    //   console.log(`parseGPXData: Found track point ${index}:`, point);
+    // });
+    // --- End Optional Logging ---
+
 
     Array.from(trackPoints).forEach((point) => {
       const lat = parseFloat(point.getAttribute('lat') || '0');
       const lon = parseFloat(point.getAttribute('lon') || '0');
-      // Use getElementsByTagNameNS with null for child elements in the default namespace
-      const eleElement = point.getElementsByTagNameNS(null, 'ele')[0]; // Use null here
+      const eleElement = point.getElementsByTagNameNS(null, 'ele')[0];
       const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : null;
 
-      if (!isNaN(lat) && !isNaN(lon)) { // Check if parsing was successful
+      if (!isNaN(lat) && !isNaN(lon)) {
         coordinates.push([lat, lon]);
 
-        // Calculate elevation gain
         if (elevation !== null && previousElevation !== null && elevation > previousElevation) {
           elevationGain += elevation - previousElevation;
         }
@@ -191,7 +214,6 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       }
     });
 
-    // Calculate total distance
     for (let i = 1; i < coordinates.length; i++) {
       const distance = calculateDistance(
         coordinates[i - 1][0], coordinates[i - 1][1],
@@ -200,17 +222,18 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       totalDistance += distance;
     }
 
-    console.log('parseGPXData (DOMParser): Final coordinates array length:', coordinates.length); // Log final coordinates length
-    console.log('parseGPXData (DOMParser): Calculated total distance (km):', totalDistance); // Log total distance
-    console.log('parseGPXData (DOMParser): Calculated elevation gain (m):', elevationGain); // Log elevation gain
+    console.log('parseGPXData (DOMParser): Final coordinates array length:', coordinates.length);
+    console.log('parseGPXData (DOMParser): Calculated total distance (km):', totalDistance);
+    console.log('parseGPXData (DOMParser): Calculated elevation gain (m):', elevationGain);
 
 
     return {
-      distance: totalDistance > 0 ? Math.round(totalDistance * 100) / 100 : 0, // Ensure 0 if no points
-      elevationGain: elevationGain > 0 ? Math.round(elevationGain) : 0, // Ensure 0 if no points
+      distance: totalDistance > 0 ? Math.round(totalDistance * 100) / 100 : 0,
+      elevationGain: elevationGain > 0 ? Math.round(elevationGain) : 0,
       coordinates
     };
   };
+
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in km
