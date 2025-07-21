@@ -51,7 +51,10 @@ export function useGPXStats(gpxUrl?: string) {
   
         const gpxContent = await gpxResponse.text();
         console.log("useGPXStats: Fetched GPX content (first 500 chars):", gpxContent.substring(0, 500));
-  
+        
+        // log to console
+        console.log("Raw GPX content:", gpxContent);
+
         const parsedStats = parseGPXData(gpxContent);
         console.log("useGPXStats: Parsed stats:", parsedStats);
   
