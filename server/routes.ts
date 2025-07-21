@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { parseGPXFile, calculateRouteMatch } from "./gpx-parser";
 import { WeatherService } from "./weather";
 import { GPXProximityMatcher } from "./gpx-proximity-matcher";
+import fetch from 'node-fetch'; // Import fetch if not already imported
 
 // Extend Request type to include userId
 declare global {
@@ -1088,31 +1089,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/gpx/:filename', async (req, res) => {
     try {
       const filename = req.params.filename;
-      // Use the filename directly as the Supabase storage path
-      const filePath = filename; // MODIFIED: Removed the extra 'gpx-uploads/' prefix
-
-      console.log(`Attempting to generate signed URL for: ${filePath}`); // Add this line for logging
-
+      const filePath = filename;
+  
+      console.log(`Attempting to generate signed URL for: ${filePath}`);
+  
       // Generate a signed URL for the file
       const { data, error } = await supabase.storage
         .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
-        .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour (adjust as needed)
-
+        .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour
+  
       if (error) {
-        console.error('Supabase create signed URL error:', error.message); // Log the specific error message
-        return res.status(500).json({ message: 'Failed to generate GPX file URL', error: error.message }); // Include error message in response
+        console.error('Supabase create signed URL error:', error.message);
+        return res.status(500).json({ message: 'Failed to generate GPX file URL', error: error.message });
       }
-
-      console.log(`Successfully generated signed URL: ${data.signedUrl}`); // Add this line for logging
-
-      // Redirect to the signed URL
-      res.redirect(data.signedUrl);
-
-    } catch (error: any) { // Catch any type of error
-      console.error('GPX file serving error:', error.message); // Log the specific error message
-      res.status(500).json({ message: 'Internal server error', error: error.message }); // Include error message in response
+  
+      console.log(`Successfully generated signed URL: ${data.signedUrl}`);
+  
+      // Fetch the GPX content from the signed URL
+      const response = await fetch(data.signedUrl);
+  
+      if (!response.ok) {
+        console.error('Failed to fetch GPX from signed URL:', response.statusText);
+        return res.status(response.status).json({ message: 'Failed to fetch GPX file', error: response.statusText });
+      }
+  
+      const gpxContent = await response.text();
+  
+      // Set CORS headers
+      res.set('Access-Control-Allow-Origin', '*'); // Or your frontend's specific origin
+      res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      res.set('Content-Type', 'application/gpx+xml'); // Set the correct content type
+  
+      // Send the GPX content to the frontend
+      res.send(gpxContent);
+  
+    } catch (error: any) {
+      console.error('GPX file serving error:', error.message);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   });
+  
 
   // Delete solo activity
   app.delete('/api/activities/:id', requireAuth, async (req, res) => {
