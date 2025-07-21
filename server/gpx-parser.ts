@@ -64,13 +64,13 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
       let heartRate: number | undefined;
 
       // Extract elevation
-      const eleMatch = content.match(/<ele>([^<]+)</ele>/);
+      const eleMatch = content.match(/<ele>([^<]+)<\/ele>/);
       if (eleMatch) {
         elevation = parseFloat(eleMatch[1]);
       }
 
       // Extract time
-      const timeMatch = content.match(/<time>([^<]+)</time>/);
+      const timeMatch = content.match(/<time>([^<]+)<\/time>/);
       if (timeMatch) {
         time = new Date(timeMatch[1]);
         if (!minTime || time < minTime) minTime = time;
@@ -78,10 +78,10 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
       }
 
       // Extract heart rate (support multiple Garmin extensions)
-      const hrMatch = content.match(/<ns3:hr>([^<]+)</ns3:hr>/) || 
-                   content.match(/<hr>([^<]+)</hr>/) ||
-                   content.match(/<gpxtpx:hr>([^<]+)</gpxtpx:hr>/) ||
-                   content.match(/<TrackPointExtension>[sS]*?<hr>([^<]+)</hr>/);
+      const hrMatch = content.match(/<ns3:hr>([^<]+)<\/ns3:hr>/) ||
+                   content.match(/<hr>([^<]+)<\/hr>/) ||
+                   content.match(/<gpxtpx:hr>([^<]+)<\/gpxtpx:hr>/) ||
+                   content.match(/<TrackPointExtension>[\s\S]*?<hr>([^<]+)<\/hr>/);
       if (hrMatch) {
         heartRate = parseInt(hrMatch[1]);
         if (!isNaN(heartRate) && heartRate > 0) {
@@ -177,7 +177,7 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
       averageHeartRate,
       maxHeartRate,
       calories: undefined, // Will be calculated separately if needed
-      startTime: minTime,
+      startTime: minTime !== null ? minTime : undefined,
       trackPoints,
     };
   } catch (error) {
