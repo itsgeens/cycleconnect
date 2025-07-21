@@ -167,7 +167,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve static files from uploads directory
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
+  // Serve GPX files for map preview
+  app.get('/api/gpx/:filename', async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const filePath = filename;
+  
+      console.log(`Attempting to generate signed URL for: ${filePath}`);
+  
+      // Generate a signed URL for the file
+      const { data, error } = await supabase.storage
+        .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+        .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour
+  
+      if (error) {
+        console.error('Supabase create signed URL error:', error.message);
+        return res.status(500).json({ message: 'Failed to generate GPX file URL', error: error.message });
+      }
+  
+      console.log(`Successfully generated signed URL: ${data.signedUrl}`);
+  
+      // Fetch the GPX content from the signed URL
+      const response = await fetch(data.signedUrl);
+  
+      if (!response.ok) {
+        console.error('Failed to fetch GPX from signed URL:', response.statusText);
+        return res.status(response.status).json({ message: 'Failed to fetch GPX file', error: response.statusText });
+      }
+  
+      const gpxContent = await response.text();
+  
+      // Set CORS headers
+      res.set('Access-Control-Allow-Origin', '*'); // Or your frontend's specific origin
+      res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      res.set('Content-Type', 'application/gpx+xml'); // Set the correct content type
+  
+      // Send the GPX content to the frontend
+      res.send(gpxContent);
+  
+    } catch (error: any) {
+      console.error('GPX file serving error:', error.message);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  });
+  
   // Auth routes
   app.post("/api/register", async (req, res) => {
     try {
@@ -1082,51 +1126,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Link organizer GPX error:", error);
       res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Serve GPX files for map preview
-  app.get('/api/gpx/:filename', async (req, res) => {
-    try {
-      const filename = req.params.filename;
-      const filePath = filename;
-  
-      console.log(`Attempting to generate signed URL for: ${filePath}`);
-  
-      // Generate a signed URL for the file
-      const { data, error } = await supabase.storage
-        .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
-        .createSignedUrl(filePath, 60 * 60); // URL expires in 1 hour
-  
-      if (error) {
-        console.error('Supabase create signed URL error:', error.message);
-        return res.status(500).json({ message: 'Failed to generate GPX file URL', error: error.message });
-      }
-  
-      console.log(`Successfully generated signed URL: ${data.signedUrl}`);
-  
-      // Fetch the GPX content from the signed URL
-      const response = await fetch(data.signedUrl);
-  
-      if (!response.ok) {
-        console.error('Failed to fetch GPX from signed URL:', response.statusText);
-        return res.status(response.status).json({ message: 'Failed to fetch GPX file', error: response.statusText });
-      }
-  
-      const gpxContent = await response.text();
-  
-      // Set CORS headers
-      res.set('Access-Control-Allow-Origin', '*'); // Or your frontend's specific origin
-      res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-      res.set('Content-Type', 'application/gpx+xml'); // Set the correct content type
-  
-      // Send the GPX content to the frontend
-      res.send(gpxContent);
-  
-    } catch (error: any) {
-      console.error('GPX file serving error:', error.message);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   });
   
