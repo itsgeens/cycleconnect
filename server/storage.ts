@@ -1,6 +1,8 @@
 import { users, rides, rideParticipants, follows, deviceConnections, activityMatches, soloActivities, organizerGpxFiles, participantMatches, type User, type InsertUser, type Ride, type InsertRide, type RideParticipant, type RideFilters, type Follow, type DeviceConnection, type InsertDeviceConnection, type ActivityMatch, type InsertActivityMatch, type SoloActivity, type InsertSoloActivity, type OrganizerGpxFile, type InsertOrganizerGpxFile, type ParticipantMatch, type InsertParticipantMatch } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
+import { supabase } from './supabase'; // MODIFIED: Added this import
+
 
 export interface IStorage {
   // User operations
@@ -304,17 +306,23 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-
-
   async deleteRide(rideId: number): Promise<void> {
+    console.log(`Attempting to delete ride with ID: ${rideId}`); // ADDED LOGGING
+
     await db.transaction(async (tx) => {
+      console.log(`Starting database transaction for ride deletion: ${rideId}`); // ADDED LOGGING
+
       // 1. Get the ride details to find the gpxFilePath
+      console.log(`Fetching ride details for deletion: ${rideId}`); // ADDED LOGGING
       const [rideToDelete] = await tx.select().from(rides).where(eq(rides.id, rideId)).limit(1);
+      console.log(`Fetched ride details: ${JSON.stringify(rideToDelete)}`); // ADDED LOGGING
 
       if (rideToDelete && rideToDelete.gpxFilePath) {
+        console.log(`Found GPX file path: ${rideToDelete.gpxFilePath}. Attempting to delete from Supabase.`); // ADDED LOGGING
         try {
           // 2. Delete the GPX file from Supabase Storage
           // Use the Supabase client directly here
+          // Ensure 'supabase' is imported at the top of the file
           const { data, error } = await supabase.storage
             .from('gpx-uploads') // Replace with your Supabase bucket name
             .remove([rideToDelete.gpxFilePath]);
@@ -329,16 +337,24 @@ export class DatabaseStorage implements IStorage {
           console.error('Error deleting GPX file from Supabase:', fileError);
           // Log the error
         }
+      } else {
+        console.log(`No GPX file path found for ride: ${rideId} or ride not found.`); // ADDED LOGGING
       }
 
       // First delete all participants associated with the ride
+      console.log(`Deleting participants for ride: ${rideId}`); // ADDED LOGGING
       await tx.delete(rideParticipants).where(eq(rideParticipants.rideId, rideId));
+      console.log(`Participants deleted for ride: ${rideId}`); // ADDED LOGGING
+
 
       // Then delete the ride record from the database
+      console.log(`Deleting ride record from database: ${rideId}`); // ADDED LOGGING
       await tx.delete(rides).where(eq(rides.id, rideId));
+      console.log(`Ride record deleted from database: ${rideId}`); // ADDED LOGGING
+
+      console.log(`Database transaction completed for ride deletion: ${rideId}`); // ADDED LOGGING
     });
   }
-
 
   async getUserRides(userId: number): Promise<{
     all: Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean }>;
