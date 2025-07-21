@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
     // Removed import GpxJs from 'gpx-js';
+import { type GPXStats } from '../../shared/gpx-types';
 
-
-    export interface GPXStats {
-      distance: number;
-      elevationGain: number;
-      coordinates: [number, number][];
-      startCoords?: { lat: number; lng: number };
-      endCoords?: { lat: number; lng: number };
-    }
 
     // Keep your calculateDistance function
     function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

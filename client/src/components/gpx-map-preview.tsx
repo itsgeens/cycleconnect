@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // Import Leaflet CSS
 import 'leaflet-gpx'; // Import leaflet-gpx
+import { type GPXStats } from '../../shared/gpx-types';
+
 
 // You might still need calculateDistance if leaflet-gpx doesn't provide total distance easily
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -23,12 +25,6 @@ interface GPXMapPreviewProps {
   className?: string;
   interactive?: boolean;
   showFullscreen?: boolean;
-}
-
-interface GPXStats {
-  distance: number;
-  elevationGain: number;
-  coordinates: [number, number][];
 }
 
 export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, className = "h-48", interactive = false, showFullscreen = false }: GPXMapPreviewProps) {
@@ -202,7 +198,5 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     </div>
   );
 }
-
-export { type GPXStats }
 
 }
