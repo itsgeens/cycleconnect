@@ -65,6 +65,7 @@
     "express-session": "^1.18.1",
     "form-data": "^4.0.4",
     "framer-motion": "^11.13.1",
+    "gpx-js": "^1.1.0",
     "gpxparser": "^3.0.8",
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
