@@ -56,9 +56,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         try {
           // Handle both absolute and relative URLs
           const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-          const fullGpxUrl = gpxUrl.startsWith('http') ? gpxUrl : `${API_BASE_URL}${gpxUrl}`;
-          
-          const response = await fetch(fullGpxUrl);
+           // Construct the URL to your backend's GPX endpoint
+            const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`;
+
+            const response = await fetch(backendGpxUrl);
+
           if (response.ok) {
             gpxContent = await response.text();
             console.log('gpx-map-preview: Fetched raw GPX content:', gpxContent); // Add this line
@@ -75,9 +77,11 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         try {
           // Handle both absolute and relative URLs
           const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-          const fullSecondaryUrl = secondaryGpxUrl.startsWith('http') ? secondaryGpxUrl : `${API_BASE_URL}${secondaryGpxUrl}`;
-          
-          const response = await fetch(fullSecondaryUrl);
+            // Construct the URL to your backend's GPX endpoint
+            const backendSecondaryGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(secondaryGpxUrl)}`;
+
+            const response = await fetch(backendSecondaryGpxUrl);
+
           if (response.ok) {
             secondaryGpxContent = await response.text();
             console.log('gpx-map-preview: Fetched raw Secondary GPX content:', secondaryGpxContent); // Add this line
