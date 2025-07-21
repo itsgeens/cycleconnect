@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import GpxParser from 'gpx-parser-browser';
+import GpxParser from 'gpxparser';
 
 interface GPXMapPreviewProps {
   gpxData?: string;

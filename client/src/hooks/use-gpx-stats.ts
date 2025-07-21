@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import GpxParser from 'gpxparser';
 
 export interface GPXStats {
   distance: number;
