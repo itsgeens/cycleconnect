@@ -149,38 +149,36 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
   const parseGPXData = (gpxContent: string): GPXStats => {
     console.log('Parsing GPX data...'); // Log start of parsing
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(gpxContent, 'text/xml');
-    
     const coordinates: [number, number][] = [];
     let totalDistance = 0;
     let elevationGain = 0;
-    let previousElevation = 0;
+    let previousElevation: number | null = null; // Use null for initial previousElevation
 
-    // Extract track points
-    const trackPoints = xmlDoc.querySelectorAll('trkpt');
-    console.log('Number of track points found:', trackPoints.length); // Log number of track points
-    
-    trackPoints.forEach((point, index) => {
-      const lat = parseFloat(point.getAttribute('lat') || '0');
-      const lon = parseFloat(point.getAttribute('lon') || '0');
-      const eleElement = point.querySelector('ele');
-      const elevation = eleElement ? parseFloat(eleElement.textContent || '0') : 0;
+    // Use a regular expression to find all trkpt elements and extract lat/lon/ele
+    const trkptRegex = /<trkpt lat="(-?\d+\.?\d*)" lon="(-?\d+\.?\d*)">\s*<ele>(-?\d+\.?\d*)<\/ele>/g;
 
-      if (index < 5) { // Log data for the first 5 track points
-        console.log(`Track point ${index}:`, { lat, lon, elevation });
-      }
+    let match;
+    while ((match = trkptRegex.exec(gpxContent)) !== null) {
+      const lat = parseFloat(match[1]);
+      const lon = parseFloat(match[2]);
+      const elevation = parseFloat(match[3]); // Extract elevation
 
-      if (lat && lon) {
+      if (!isNaN(lat) && !isNaN(lon)) { // Check if parsing was successful
         coordinates.push([lat, lon]);
-        
+
         // Calculate elevation gain
-        if (index > 0 && elevation > previousElevation) {
-          elevationGain += elevation - previousElevation;
+        if (!isNaN(elevation)) { // Only calculate if elevation is a valid number
+          if (previousElevation !== null && elevation > previousElevation) {
+            elevationGain += elevation - previousElevation;
+          }
+          previousElevation = elevation;
+        } else {
+           // If elevation is not a number, we can't use it for gain calculation
+           // We might want to decide how to handle this - for now, reset previousElevation
+           previousElevation = null;
         }
-        previousElevation = elevation;
       }
-    });
+    }
 
     // Calculate total distance
     for (let i = 1; i < coordinates.length; i++) {
@@ -191,16 +189,19 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
       totalDistance += distance;
     }
 
-    console.log('Final coordinates array length:', coordinates.length); // Log final coordinates length
-    console.log('Calculated total distance (km):', totalDistance); // Log total distance
-    console.log('Calculated elevation gain (m):', elevationGain); // Log elevation gain
+    console.log('parseGPXData: Number of track points found (regex):', coordinates.length); // Log the number of coordinates found by regex
+    console.log('parseGPXData: Final coordinates array length:', coordinates.length); // Log final coordinates length
+    console.log('parseGPXData: Calculated total distance (km):', totalDistance); // Log total distance
+    console.log('parseGPXData: Calculated elevation gain (m):', elevationGain); // Log elevation gain
+
 
     return {
-      distance: totalDistance,
-      elevationGain: elevationGain,
+      distance: totalDistance > 0 ? Math.round(totalDistance * 100) / 100 : 0, // Ensure 0 if no points
+      elevationGain: elevationGain > 0 ? Math.round(elevationGain) : 0, // Ensure 0 if no points
       coordinates
     };
   };
+
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Earth's radius in km
