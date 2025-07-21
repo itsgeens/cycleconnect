@@ -180,7 +180,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         mapInstanceRef.current = null;
       }
     };
-  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]; // Re-run effect if these change
+  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]); // Re-run effect if these change
 
 
    // Removed parseGPXData function as leaflet-gpx handles parsing for display
