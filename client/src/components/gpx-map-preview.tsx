@@ -1,6 +1,20 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import GpxParser from 'gpxparser';
+import 'leaflet/dist/leaflet.css'; // Import Leaflet CSS
+import 'leaflet-gpx'; // Import leaflet-gpx
+
+// You might still need calculateDistance if leaflet-gpx doesn't provide total distance easily
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Returns distance in km
+}
+
 
 interface GPXMapPreviewProps {
   gpxData?: string;
@@ -39,7 +53,7 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
     // Create custom panes for proper layering
     map.createPane('plannedRoute');
     map.getPane('plannedRoute')!.style.zIndex = '400';
-    
+
     map.createPane('actualRoute');
     map.getPane('actualRoute')!.style.zIndex = '450';
 
@@ -51,91 +65,103 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
 
     // Load and display GPX data
     const loadGPXData = async () => {
-      let gpxContent = gpxData;
-      
-      if (gpxUrl && !gpxContent) {
-        try {
-          // Handle both absolute and relative URLs
-          const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-           // Construct the URL to your backend's GPX endpoint
-            const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`;
+      // Function to add a GPX layer to the map
+      const addGpxLayer = (url: string, color: string, pane: string, label?: string) => {
+        if (!mapInstanceRef.current) return;
 
-            const response = await fetch(backendGpxUrl);
+        // Use L.GPX from leaflet-gpx
+        const gpxLayer = new L.GPX(url, {
+          async: true,
+          polyline_options: {
+            color: color,
+            weight: pane === 'actualRoute' ? 4 : 3,
+            opacity: pane === 'actualRoute' ? 0.9 : 0.7,
+            pane: pane
+          },
+          marker_options: {
+            startIconUrl: '', // leaflet-gpx has default markers, you can customize or disable
+            endIconUrl: '',
+            shadowUrl: '',
+          },
+          // You can use this callback to get data after parsing if needed
+          // gpx_loaded_callback: function(e) {
+          //   const gpx = e.target;
+          //   console.log('leaflet-gpx: Loaded GPX data:', gpx);
+          //   console.log('leaflet-gpx: Total distance:', gpx.getDistance()); // Distance in meters
+          //   console.log('leaflet-gpx: Elevation gain:', gpx.getElevationGain()); // Elevation gain in meters
+          // }
+        }).on('loaded', function(e) {
+           const gpx = e.target;
+           console.log(`leaflet-gpx (${label || ''}): Loaded GPX data. Distance: ${gpx.getDistance()}m, Elevation Gain: ${gpx.getElevationGain()}m`);
 
-          if (response.ok) {
-            gpxContent = await response.text();
-            console.log('gpx-map-preview: Fetched raw GPX content:', gpxContent); // Add this line
-            console.log('gpx-map-preview: Length of fetched GPX content:', gpxContent.length); // Add this line
-          }
-        } catch (error) {
-          console.error('Failed to load primary GPX file:', error);
-        }
+           // Add label if provided
+           if (label && gpx.getLayers().length > 0) {
+             const layers = gpx.getLayers(); // Get individual layers (e.g., polyline, markers)
+             const polylineLayer = layers.find((layer: L.Layer) => layer instanceof L.Polyline); // Explicitly type layer as L.Layer
+
+             if (polylineLayer) {
+               const coordinates = polylineLayer.getLatLngs(); // Get LatLngs from the polyline
+
+                if (coordinates && coordinates.length > 0) {
+                   const midPoint = coordinates[Math.floor(coordinates.length / 2)];
+                   const labelMarker = L.marker(midPoint, {
+                     icon: L.divIcon({
+                       className: 'route-label',
+                       html: `<div style=\"background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;\">${label}</div>`,
+                       iconSize: [100, 20],
+                       iconAnchor: [50, 10]
+                     })
+                   }).addTo(mapInstanceRef.current!);
+                    layersRef.current.push(labelMarker); // Store label marker for cleanup
+                 }
+             }
+           }
+
+
+            // Fit map to route bounds after both layers are potentially added
+           setTimeout(() => {
+             const bounds = new L.LatLngBounds([]);
+              layersRef.current.forEach(layer => {
+                 if (layer instanceof L.Polyline) { // Only include polylines for bounds calculation
+                    bounds.extend(layer.getBounds());
+                 }
+              });
+
+             if (bounds.isValid()) {
+                mapInstanceRef.current?.fitBounds(bounds, { padding: [50, 50] }); // Increased padding
+             } else {
+                console.warn('leaflet-gpx: Bounds are not valid, cannot fit map.');
+             }
+           }, 200); // Increased delay
+
+
+        }).addTo(mapInstanceRef.current!);
+
+        // Store layer for cleanup
+        layersRef.current.push(gpxLayer);
+      };
+
+
+      // Load primary GPX
+      if (gpxUrl) {
+         const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+         const backendGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(gpxUrl)}`;
+         addGpxLayer(backendGpxUrl, '#3b82f6', 'plannedRoute', 'Planned Route');
+      } else if (gpxData) {
+         // leaflet-gpx can also load from a string, but it's less common in examples.
+         // You might need to save gpxData to a Blob or a temporary URL first if direct string loading isn't supported or straightforward.
+         console.error("Direct loading of gpxData string with leaflet-gpx is not straightforward. Please use gpxUrl.");
+         // As a workaround for gpxData, you might have to fetch it from a temporary URL on your backend if you can't use gpxUrl directly.
       }
 
-      // Load secondary GPX (organizer's route)
-      let secondaryGpxContent = '';
+
+      // Load secondary GPX
       if (secondaryGpxUrl) {
-        try {
-          // Handle both absolute and relative URLs
-          const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-            // Construct the URL to your backend's GPX endpoint
-            const backendSecondaryGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(secondaryGpxUrl)}`;
-
-            const response = await fetch(backendSecondaryGpxUrl);
-
-          if (response.ok) {
-            secondaryGpxContent = await response.text();
-            console.log('gpx-map-preview: Fetched raw Secondary GPX content:', secondaryGpxContent); // Add this line
-            console.log('gpx-map-preview: Length of fetched Secondary GPX content:', secondaryGpxContent.length); // Add this line
-          }
-        } catch (error) {
-          console.error('Failed to load secondary GPX file:', error);
-        }
+         const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+         const backendSecondaryGpxUrl = `${API_BASE_URL}/api/gpx/${encodeURIComponent(secondaryGpxUrl)}`;
+         addGpxLayer(backendSecondaryGpxUrl, '#22c55e', 'actualRoute', 'Organizer\'s Actual Route');
       }
 
-      // Display primary route in blue (planned route)
-      if (gpxContent) {
-        console.log('GPX Content:', gpxContent); // Log GPX content
-        const stats = parseGPXData(gpxContent);
-        console.log('Parsed GPX Stats:', stats); // Log parsed stats
-        if (stats.coordinates.length > 0) {
-          displayGPXRoute(map, stats.coordinates, '#3b82f6', 'Planned Route');
-        }
-      }
-
-      // Display secondary route in green (organizer's actual route)
-      if (secondaryGpxContent) {
-        console.log('Secondary GPX Content:', secondaryGpxContent); // Log secondary GPX content
-        const secondaryStats = parseGPXData(secondaryGpxContent);
-        console.log('Parsed Secondary GPX Stats:', secondaryStats); // Log parsed secondary stats
-        if (secondaryStats.coordinates.length > 0) {
-          displayGPXRoute(map, secondaryStats.coordinates, '#22c55e', 'Organizer\\\'s Actual Route');
-        }
-      }
-
-       // Fit map to route bounds with a small delay
-       if ((gpxContent || secondaryGpxContent) && mapInstanceRef.current) {
-        setTimeout(() => {
-          const allCoordinates = [];
-          if (gpxContent) {
-            const primaryStats = parseGPXData(gpxContent); // Re-parse to get coordinates for bounds
-            if (primaryStats.coordinates.length > 0) {
-              allCoordinates.push(...primaryStats.coordinates);
-            }
-          }
-          if (secondaryGpxContent) {
-            const secondaryStats = parseGPXData(secondaryGpxContent); // Re-parse to get coordinates for bounds
-            if (secondaryStats.coordinates.length > 0) {
-              allCoordinates.push(...secondaryStats.coordinates);
-            }
-          }
-
-          if (allCoordinates.length > 0) {
-            const bounds = L.latLngBounds(allCoordinates);
-            mapInstanceRef.current?.fitBounds(bounds, { padding: [20, 20] });
-          }
-        }, 100);
-      }
     };
 
     loadGPXData();
@@ -148,179 +174,23 @@ export default function GPXMapPreview({ gpxData, gpxUrl, secondaryGpxUrl, classN
         }
       });
       layersRef.current = [];
-      
+
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
-  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]);
+  }, [gpxData, gpxUrl, secondaryGpxUrl, interactive]); // Re-run effect if these change
 
-  function parseGPXData(gpxContent: string): GPXStats {
-    console.log('Parsing GPX data using gpx-parser-browser...');
-    console.log('parseGPXData: Received gpxContent length:', gpxContent.length);
-  
-    try {
-      const parser = new GpxParser();
-      parser.parse(gpxContent);
-  
-      // The parsed data is available in parser.tracks
-      const tracks = parser.tracks;
-  
-      if (!tracks || tracks.length === 0) {
-        console.warn('parseGPXData: No tracks found in GPX data.');
-        return {
-          distance: 0,
-          elevationGain: 0,
-          coordinates: []
-        };
-      }
-  
-      // Assuming you are interested in the first track and its segments
-      const firstTrack = tracks[0];
-      const coordinates: [number, number][] = [];
-      let totalDistance = 0;
-      let elevationGain = 0;
-      let previousElevation: number | null = null;
-  
-      if (firstTrack.segments && firstTrack.segments.length > 0) {
-        firstTrack.segments.forEach(segment => {
-          segment.points.forEach(point => {
-            const lat = point.lat;
-            const lon = point.lon;
-            const elevation = point.ele !== undefined ? point.ele : null; // Use point.ele for elevation
-  
-            if (lat !== undefined && lon !== undefined) {
-              coordinates.push([lat, lon]);
-  
-              // Calculate elevation gain
-              if (elevation !== null && previousElevation !== null && elevation > previousElevation) {
-                elevationGain += elevation - previousElevation;
-              }
-              previousElevation = elevation;
-            }
-          });
-        });
-      } else {
-           console.warn('parseGPXData: No segments or points found in the first track.');
-      }
-  
-  
-      // Calculate total distance (using the library's calculated distance if available, otherwise calculate manually)
-      totalDistance = parser.tracks[0]?.distance?.total || 0; // Use library's distance
-  
-       // If library's distance is 0, fall back to manual calculation
-      if (totalDistance === 0 && coordinates.length > 1) {
-          for (let i = 1; i < coordinates.length; i++) {
-              const distance = calculateDistance(
-                  coordinates[i - 1][0], coordinates[i - 1][1],
-                  coordinates[i][0], coordinates[i][1]
-              );
-              totalDistance += distance;
-          }
-           console.log('parseGPXData: Calculated distance manually as library distance was 0.');
-      }
-  
-  
-      console.log('parseGPXData (Library): Number of coordinates found:', coordinates.length);
-      console.log('parseGPXData (Library): Calculated total distance (km):', totalDistance > 0 ? Math.round(totalDistance / 1000 * 100) / 100 : 0); // Convert meters to km and round
-      console.log('parseGPXData (Library): Calculated elevation gain (m):', elevationGain > 0 ? Math.round(elevationGain) : 0);
-  
-  
-      return {
-        distance: totalDistance > 0 ? Math.round(totalDistance / 1000 * 100) / 100 : 0, // Convert meters to km and round
-        elevationGain: elevationGain > 0 ? Math.round(elevationGain) : 0,
-        coordinates
-      };
-  
-    } catch (error) {
-      console.error('parseGPXData: Error parsing GPX with gpx-parser-browser:', error);
-      // Return empty stats on parsing error
-      return {
-        distance: 0,
-        elevationGain: 0,
-        coordinates: []
-      };
-    }
-  }
-  
-  // Keep your existing calculateDistance function as a fallback if the library's distance is zero
-  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Returns distance in km
-  }
 
-  const displayGPXRoute = (map: L.Map, coordinates: [number, number][], color: string = '#3b82f6', label?: string) => {
-    console.log('displayGPXRoute: Received coordinates:', coordinates); // Add this logger
-    console.log('displayGPXRoute: Number of coordinates received:', coordinates.length); // Add this logger
+   // Removed parseGPXData function as leaflet-gpx handles parsing for display
 
-    if (coordinates.length === 0) return;
 
-    // Determine if this is the organizer's actual route (green) or planned route (blue)
-    const isOrganizerRoute = color === '#22c55e';
-    
-    // Create route polyline with appropriate z-index
-    const polyline = L.polyline(coordinates, {
-      color: color,
-      weight: isOrganizerRoute ? 4 : 3, // Thicker line for organizer's route
-      opacity: isOrganizerRoute ? 0.9 : 0.7, // More opaque for organizer's route
-      pane: isOrganizerRoute ? 'actualRoute' : 'plannedRoute' // Higher pane for organizer's route
-    }).addTo(map);
+  // Removed displayGPXRoute function as leaflet-gpx handles adding layer to map
 
-    // Store layer for cleanup
-    layersRef.current.push(polyline);
 
-    // Add label if provided
-    if (label && coordinates.length > 0) {
-      const midPoint = coordinates[Math.floor(coordinates.length / 2)];
-      const labelMarker = L.marker(midPoint, {
-        icon: L.divIcon({
-          className: 'route-label',
-          html: `<div style="background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 12px; font-weight: bold;">${label}</div>`,
-          iconSize: [100, 20],
-          iconAnchor: [50, 10]
-        })
-      }).addTo(map);
-      
-      // Store label marker for cleanup
-      layersRef.current.push(labelMarker);
-    }
+  // You might still need calculateDistance if you need it elsewhere or for fallback distance calculation in useGPXStats
 
-    // Fit map to route bounds (only for the first route)
-    if (coordinates.length > 0 && layersRef.current.length <= 2) {
-      const bounds = L.latLngBounds(coordinates);
-      map.fitBounds(bounds, { padding: [20, 20] });
-    }
-
-    // Add start and end markers (only for the first route)
-    if (coordinates.length > 1 && layersRef.current.length <= 2) {
-      const startIcon = L.divIcon({
-        html: '<div class="w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>',
-        className: 'custom-marker',
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
-      });
-
-      const endIcon = L.divIcon({
-        html: '<div class="w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>',
-        className: 'custom-marker',
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
-      });
-
-      const startMarker = L.marker(coordinates[0], { icon: startIcon }).addTo(map);
-      const endMarker = L.marker(coordinates[coordinates.length - 1], { icon: endIcon }).addTo(map);
-      
-      // Store markers for cleanup
-      layersRef.current.push(startMarker, endMarker);
-    }
-  };
 
   if (!gpxData && !gpxUrl) {
     return (
