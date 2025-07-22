@@ -45,8 +45,12 @@ export class GPXProximityMatcher {
   }
 
   private compareProximity(organizerData: GpxData, participantData: GpxData): ProximityResult {
+    console.log('Inside compareProximity - organizerData:', organizerData); // Add this log
+    console.log('Inside compareProximity - participantData:', participantData); // Add this log
     const organizerPoints = organizerData.trackPoints.filter(p => p.time); // Only points with timestamps
+    console.log('Inside compareProximity - organizerPoints after filter:', organizerPoints); // Add this log
     const participantPoints = participantData.trackPoints.filter(p => p.time);
+    console.log('Inside compareProximity - participantPoints after filter:', participantPoints); // Add this log
 
     if (organizerPoints.length === 0 || participantPoints.length === 0) {
       return {
