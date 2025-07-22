@@ -97,7 +97,7 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
         heartRate,
       });
     }
-
+    console.log('Parsed trackPoints:', trackPoints); // Add this line
     // Calculate distance using Haversine formula
     for (let i = 1; i < trackPoints.length; i++) {
       const prevPoint = trackPoints[i - 1];

@@ -212,6 +212,8 @@ export class GPXRouteMatcher {
     plannedRoute: TrackPoint[],
     uploadedRoute: TrackPoint[]
   ): number {
+    console.log('plannedRoute:', plannedRoute); // Add this line
+    console.log('uploadedRoute:', uploadedRoute); // Add this line
     const plannedElevations = plannedRoute
       .map(p => p.elevation)
       .filter(e => e !== undefined) as number[];
