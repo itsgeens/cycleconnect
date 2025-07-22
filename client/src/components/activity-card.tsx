@@ -39,6 +39,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useGPXStats } from "@/hooks/use-gpx-stats";
 
 interface ActivityCardProps {
   activity: any;
@@ -51,6 +52,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { stats } = useGPXStats(activity.gpxFilePath);
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -166,6 +168,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
           gpxUrl={`/api/gpx/${activity.gpxFilePath?.split('/').pop()}`}
           className="h-48"
           interactive={false}
+          stats={stats} // Add this line
         />
         
         {/* Activity Type Badge */}
