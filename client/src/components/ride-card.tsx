@@ -71,11 +71,12 @@ export default function RideCard({
     >
       <div className="relative">
         {/* GPX Map Preview */}
-        console.log('RideCard: Attempting to render GPXMapPreview for ride:', ride.id, 'with gpxUrl:', ride.gpxFilePath);
+        {/* Remove console.log statements within JSX later if they are causing text on card */}
         <GPXMapPreview
           gpxUrl={ride.gpxFilePath}
           className="h-48"
           interactive={false}
+          stats={stats} // <--- PASS THE stats OBJECT HERE
         />
         
         {/* Tags overlaid on top left */}
