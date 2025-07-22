@@ -28,6 +28,7 @@ export class GPXProximityMatcher {
     minMatchPercentage: 80, // 80% completion threshold
   }) {
     this.config = config;
+    console.log('GPXProximityMatcher constructor called with config:', this.config); // Add this log
   }
 
   /**
@@ -37,9 +38,12 @@ export class GPXProximityMatcher {
     organizerGpxPath: string,
     participantGpxPath: string
   ): Promise<ProximityResult> {
+    console.log('checkParticipantProximity called with paths:', { organizerGpxPath, participantGpxPath }); // Add this log
     // Parse both GPX files
     const organizerData = await parseGPXFile(organizerGpxPath);
+    console.log('checkParticipantProximity - organizerData after parsing:', organizerData); // Add this log
     const participantData = await parseGPXFile(participantGpxPath);
+    console.log('checkParticipantProximity - participantData after parsing:', participantData); // Add this log
 
     return this.compareProximity(organizerData, participantData);
   }
