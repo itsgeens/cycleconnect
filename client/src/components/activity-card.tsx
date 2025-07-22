@@ -45,6 +45,12 @@ interface ActivityCardProps {
   activity: any;
   type: 'group' | 'solo';
 }
+// Helper function to calculate user level based on XP
+const calculateLevel = (xp: number): number => {
+  // Simple leveling formula: 100 XP per level starting at level 1
+  // Adjust the divisor (100) for faster or slower leveling
+  return Math.floor(xp / 100) + 1;
+};
 
 export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const [, navigate] = useLocation();
@@ -205,6 +211,19 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
                 Completed on {formatCompletedDate(completedDate)}
               </span>
             </div>
+
+            {activity.user?.xp !== undefined && ( // Check if user and xp exist
+              <>
+                <div className="flex items-center gap-2 text-sm text-gray-600"> {/* Reduced bottom margin for closer placement */}
+                  <Trophy className="w-4 h-4 text-yellow-500" /> {/* Using Trophy icon for XP */}
+                  <span>XP: {activity.user.xp}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-3"> {/* Added bottom margin to space before description */}
+                  <TrendingUp className="w-4 h-4 text-purple-500" /> {/* Using TrendingUp for Level */}
+                  <span>Level: {calculateLevel(activity.user.xp)}</span>
+                </div>
+              </>
+            )}
 
             {activity.description && (
               <p className="text-gray-600 text-sm mb-4 line-clamp-2">

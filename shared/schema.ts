@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  xp: integer("xp").default(0).notNull(), // Added XP column here
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -249,6 +250,7 @@ export const rideFiltersSchema = z.object({
 });
 
 export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick({
+  userId: true, 
   name: true,
   description: true,
   activityType: true,

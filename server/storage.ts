@@ -14,7 +14,7 @@ export interface IStorage {
   
   // Ride operations
   createRide(ride: InsertRide & { organizerId: number, gpxFilePath: string }): Promise<Ride>;
-  getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number }>>;
+  getRides(filters?: RideFilters): Promise<Array<Ride & { organizerName: string; participantCount: number; participants?: Array<{ id: number; name: string }> }>>;
   getRide(id: number): Promise<Ride | undefined>;
   deleteRide(id: number): Promise<void>;
   
@@ -87,7 +87,11 @@ export interface IStorage {
   getUserCompletedActivities(userId: number): Promise<{
     completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date }>;
     soloActivities: SoloActivity[];
+    
   }>;
+  // ADDED: Function to increment user XP
+  incrementUserXP(userId: number, amount: number): Promise<void>;
+  // END ADDED
 
   // Organizer GPX operations
   createOrganizerGpx(gpxFile: InsertOrganizerGpxFile): Promise<OrganizerGpxFile>;
@@ -473,6 +477,7 @@ export class DatabaseStorage implements IStorage {
         completedAt: rides.completedAt,
         createdAt: rides.createdAt,
         organizerName: users.name,
+        weatherData: rides.weatherData, // Added weatherData
         participantCount: sql<number>`COUNT(DISTINCT ${rideParticipants.userId})`,
       })
       .from(rides)
@@ -492,43 +497,152 @@ export class DatabaseStorage implements IStorage {
     const joined = allRides.filter(ride => ride.organizerId !== userId);
 
     const all = allRides.map(ride => ({
-      ...ride,
+      id: ride.id,
+      name: ride.name,
+      description: ride.description, // description can be null
+      dateTime: ride.dateTime,
+      rideType: ride.rideType,
+      surfaceType: ride.surfaceType,
+      gpxFilePath: ride.gpxFilePath,
+      meetupLocation: ride.meetupLocation,
+      meetupCoords: ride.meetupCoords, // Corrected to ride.meetupCoords
+      organizerId: ride.organizerId,
+      isCompleted: ride.isCompleted,
+      completedAt: ride.completedAt, // completedAt can be null for non-completed rides
+      createdAt: ride.createdAt,
       organizerName: ride.organizerName || 'Unknown',
       participantCount: Number(ride.participantCount),
+      weatherData: ride.weatherData as any, // Explicitly cast weatherData
       isOrganizer: ride.organizerId === userId,
-      isParticipant: ride.organizerId !== userId,
-    }));
+      isParticipant: ride.organizerId !== userId, // This logic seems reversed based on the comment
+    }))as Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean }>;
 
     return {
       all,
       organized: organized.map(ride => ({
-        ...ride,
+        id: ride.id,
+        name: ride.name,
+        description: ride.description,
+        dateTime: ride.dateTime,
+        rideType: ride.rideType,
+        surfaceType: ride.surfaceType,
+        gpxFilePath: ride.gpxFilePath,
+        meetupLocation: ride.meetupLocation,
+        meetupCoords: ride.meetupCoords as { lat: number; lng: number }, // Explicitly cast
+        organizerId: ride.organizerId,
+        isCompleted: ride.isCompleted,
+        completedAt: ride.completedAt,
+        createdAt: ride.createdAt,
+        weatherData: ride.weatherData as any, // Explicitly cast weatherData
         organizerName: ride.organizerName || 'Unknown',
         participantCount: Number(ride.participantCount),
-      })),
-      joined: joined.map(ride => ({
-        ...ride,
-        organizerName: ride.organizerName || 'Unknown',
-        participantCount: Number(ride.participantCount),
-      })),
+      })) as Array<Ride & { organizerName: string; participantCount: number }>,
     };
   }
 
   async completeRide(rideId: number, userId: number): Promise<void> {
+    console.log(`[completeRide] Attempting to complete ride ${rideId} by user ${userId}`);
+
     // Check if user is the organizer
     const [ride] = await db.select().from(rides).where(eq(rides.id, rideId));
-    if (!ride || ride.organizerId !== userId) {
-      throw new Error("Only the organizer can complete a ride");
+    if (!ride) {
+         console.warn(`[completeRide] Ride ${rideId} not found.`);
+         throw new Error("Ride not found.");
+    }
+    if (ride.organizerId !== userId) {
+        console.warn(`[completeRide] User ${userId} is not the organizer of ride ${rideId}. Organizer is ${ride.organizerId}.`);
+        throw new Error("Only the organizer can complete a ride");
+    }
+    console.log(`[completeRide] User ${userId} verified as organizer for ride ${rideId}. Proceeding.`);
+
+
+    // --- XP Calculation and Distribution ---
+
+    console.log(`[completeRide] Starting XP calculation and distribution for ride ${rideId}.`);
+
+    // 1. Fetch participant activity data for this ride
+    const participantActivities = await db
+      .select()
+      .from(activityMatches)
+      .where(eq(activityMatches.rideId, rideId));
+
+    console.log(`[completeRide] Found ${participantActivities.length} participant activities for ride ${rideId}.`);
+
+    // 2. Calculate and add XP for each participant with activity data
+    for (const activity of participantActivities) {
+        console.log(`[completeRide] Processing activity match ${activity.id} for participant ${activity.userId}.`);
+        // Calculate XP based on participant's activity data
+        // Ensure distance, elevationGain, averageSpeed are treated as numbers
+        const distance = typeof activity.distance === 'string' ? parseFloat(activity.distance) : activity.distance || 0;
+        const elevationGain = typeof activity.elevationGain === 'string' ? parseFloat(activity.elevationGain) : activity.elevationGain || 0;
+        const averageSpeed = typeof activity.averageSpeed === 'string' ? parseFloat(activity.averageSpeed) : activity.averageSpeed || 0;
+
+
+        // Calculate XP: distance + elevation + speed (using the revised multiplier)
+        // Use Math.max to ensure XP is not negative in case of weird data
+        const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1));
+
+        if (earnedXp > 0) {
+             console.log(`[completeRide] Calculated ${earnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}).`);
+             await this.incrementUserXP(activity.userId, earnedXp);
+             console.log(`[completeRide] Added ${earnedXp.toFixed(2)} XP to user ${activity.userId}.`);
+        } else {
+            console.log(`[completeRide] Calculated 0 XP for participant ${activity.userId} (Activity ${activity.id}). Skipping XP increment.`);
+        }
     }
 
+    // 3. Calculate and add XP for the organizer if they uploaded a GPX
+    const [organizerGpx] = await db
+        .select()
+        .from(organizerGpxFiles)
+        .where(eq(organizerGpxFiles.rideId, rideId));
+
+    console.log(`[completeRide] Organizer GPX found for ride ${rideId}: ${!!organizerGpx}`);
+
+    if (organizerGpx) {
+        // Calculate XP based on organizer's GPX data and a bonus for organizing
+         const distance = typeof organizerGpx.distance === 'string' ? parseFloat(organizerGpx.distance) : organizerGpx.distance || 0;
+        const elevationGain = typeof organizerGpx.elevationGain === 'string' ? parseFloat(organizerGpx.elevationGain) : organizerGpx.elevationGain || 0;
+
+        const organizingBonusXp = 50; // Example bonus XP for organizing
+
+        const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + organizingBonusXp);
+
+         if (earnedXp > 0) {
+            console.log(`[completeRide] Calculated ${earnedXp.toFixed(2)} XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}).`);
+            await this.incrementUserXP(userId, earnedXp); // userId is the organizerId
+            console.log(`[completeRide] Added ${earnedXp.toFixed(2)} XP to organizer ${userId}.`);
+         } else {
+             console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}). Skipping XP increment.`);
+         }
+    } else {
+         // If the organizer didn't upload a GPX but completed the ride,
+         // they still get a small amount of XP for organizing.
+         const organizingBonusXp = 20; // Smaller bonus if no GPX
+
+         if (organizingBonusXp > 0) {
+            console.log(`[completeRide] Calculated ${organizingBonusXp.toFixed(2)} XP for organizer ${userId} (no GPX).`);
+            await this.incrementUserXP(userId, organizingBonusXp);
+             console.log(`[completeRide] Added ${organizingBonusXp.toFixed(2)} XP to organizer ${userId}.`);
+         } else {
+             console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (no GPX). Skipping XP increment.`);
+         }
+    }
+
+    console.log(`[completeRide] Finished XP calculation and distribution for ride ${rideId}.`);
+    // --- End XP Calculation ---
+
+    // Mark the ride as completed
+    console.log(`[completeRide] Marking ride ${rideId} as completed.`);
     await db
       .update(rides)
-      .set({ 
-        isCompleted: true, 
-        completedAt: new Date() 
+      .set({
+        isCompleted: true,
+        completedAt: new Date()
       })
       .where(eq(rides.id, rideId));
-  }
+    console.log(`[completeRide] Ride ${rideId} marked as completed.`);
+}
 
   async getUserStats(userId: number, timeframe: string): Promise<{
     ridesJoined: number;
@@ -584,18 +698,16 @@ export class DatabaseStorage implements IStorage {
           AND ${rides.isCompleted} = true 
           THEN ${rides.id} 
           END)`,
-        totalDistance: sql<number>`SUM(CASE 
-          WHEN ${activityMatches.userId} = ${userId} 
-          AND ${activityMatches.distance} IS NOT NULL 
-          THEN CAST(${activityMatches.distance} AS DECIMAL) 
-          ELSE 0 
-          END)`,
-        totalElevation: sql<number>`SUM(CASE 
-          WHEN ${activityMatches.userId} = ${userId} 
-          AND ${activityMatches.elevationGain} IS NOT NULL 
-          THEN CAST(${activityMatches.elevationGain} AS DECIMAL) 
-          ELSE 0 
-          END)`,
+          totalDistance: sql<number>`SUM(COALESCE(
+            CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.distance} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.distance} AS DECIMAL) ELSE 0 END,
+            0
+          ))`,
+          totalElevation: sql<number>`SUM(COALESCE(
+            CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.elevationGain} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.elevationGain} AS DECIMAL) ELSE 0 END,
+            0
+          ))`,          
       })
       .from(rides)
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
@@ -626,18 +738,16 @@ export class DatabaseStorage implements IStorage {
           AND ${rides.isCompleted} = true 
           THEN ${rides.id} 
           END)`,
-        totalDistance: sql<number>`SUM(CASE 
-          WHEN ${activityMatches.userId} = ${userId} 
-          AND ${activityMatches.distance} IS NOT NULL 
-          THEN CAST(${activityMatches.distance} AS DECIMAL) 
-          ELSE 0 
-          END)`,
-        totalElevation: sql<number>`SUM(CASE 
-          WHEN ${activityMatches.userId} = ${userId} 
-          AND ${activityMatches.elevationGain} IS NOT NULL 
-          THEN CAST(${activityMatches.elevationGain} AS DECIMAL) 
-          ELSE 0 
-          END)`,
+          totalDistance: sql<number>`SUM(COALESCE(
+            CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.distance} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.distance} AS DECIMAL) ELSE 0 END,
+            0
+          ))`,
+          totalElevation: sql<number>`SUM(COALESCE(
+            CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.elevationGain} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.elevationGain} AS DECIMAL) ELSE 0 END,
+            0
+          ))`,          
       })
       .from(rides)
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
@@ -1089,10 +1199,43 @@ export class DatabaseStorage implements IStorage {
 
   // Solo activities operations
   async createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity> {
+    // Manually construct the insert data to match the Drizzle schema types
+    const insertData = {
+        userId: activity.userId,
+        name: activity.name,
+        description: activity.description, // description is optional
+        activityType: activity.activityType,
+        gpxFilePath: activity.gpxFilePath,
+        distance: activity.distance, // decimal
+        duration: activity.duration, // integer
+        movingTime: activity.movingTime, // integer
+        elevationGain: activity.elevationGain, // decimal
+        averageSpeed: activity.averageSpeed, // decimal
+        averageHeartRate: activity.averageHeartRate, // integer
+        maxHeartRate: activity.maxHeartRate, // integer
+        calories: activity.calories, // integer
+        deviceName: activity.deviceName, // text
+        deviceType: activity.deviceType, // text (optional enum in schema)
+        completedAt: activity.completedAt instanceof Date ? activity.completedAt : new Date(activity.completedAt), // Ensure completedAt is a Date object
+        // createdAt will use the defaultNow() from the schema
+    };
+
     const [newActivity] = await db
       .insert(soloActivities)
-      .values(activity)
+      .values(insertData) // Use the manually constructed insertData
       .returning();
+
+    // Calculate XP for the solo activity
+    const distance = newActivity.distance ? parseFloat(newActivity.distance.toString()) : 0;
+    const elevationGain = newActivity.elevationGain ? parseFloat(newActivity.elevationGain.toString()) : 0;
+    const averageSpeed = newActivity.averageSpeed ? parseFloat(newActivity.averageSpeed.toString()) : 0;
+
+    // Calculate XP: distance + elevation + speed (using the revised multiplier)
+    const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
+
+    // Add XP to the user
+    await this.incrementUserXP(newActivity.userId, earnedXp);
+
     return newActivity;
   }
 
@@ -1115,7 +1258,19 @@ export class DatabaseStorage implements IStorage {
   async deleteSoloActivity(id: number): Promise<void> {
     await db.delete(soloActivities).where(eq(soloActivities.id, id));
   }
-
+  // ADDED: Function to increment user XP
+  async incrementUserXP(userId: number, amount: number): Promise<void> {
+  if (amount <= 0) {
+      console.warn(`Attempted to increment XP by a non-positive amount for user ${userId}: ${amount}`);
+      return; // Do not process non-positive XP amounts
+  }
+  await db
+    .update(users)
+    .set({
+      xp: sql`${users.xp} + ${amount}`,
+    })
+    .where(eq(users.id, userId));
+  }
   async getUserCompletedActivities(userId: number): Promise<{
     completedRides: Array<Ride & { organizerName: string; participantCount: number; completedAt: Date; userActivityData?: ActivityMatch }>;
     soloActivities: SoloActivity[];
@@ -1203,10 +1358,26 @@ export class DatabaseStorage implements IStorage {
         console.log(`User activity data for ride ${ride.id}:`, finalUserActivityData);
 
         const result = {
-          ...ride,
-          userActivityData: finalUserActivityData,
+          // Include all properties from the base Ride type from the select query result
+          id: ride.id,
+          name: ride.name,
+          description: ride.description,
+          dateTime: ride.dateTime,
+          rideType: ride.rideType,
+          surfaceType: ride.surfaceType,
+          gpxFilePath: ride.gpxFilePath,
+          meetupLocation: ride.meetupLocation,
+          meetupCoords: ride.meetupCoords as { lat: number; lng: number }, // Explicitly cast
+          organizerId: ride.organizerId,
+          isCompleted: ride.isCompleted,
+          completedAt: ride.completedAt!, // Use non-null assertion as these are completed rides
+          createdAt: ride.createdAt,
+          weatherData: ride.weatherData as any, // Explicitly cast weatherData
+          // Add the additional properties expected in the interface
+          organizerName: ride.organizerName || 'Unknown',
+          participantCount: Number(ride.participantCount), // Ensure number type
+          // userActivityData is fetched but NOT included in the completedRides array itself as per the interface
         };
-        
         console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
         
         return result;
@@ -1217,7 +1388,7 @@ export class DatabaseStorage implements IStorage {
     const soloActivities = await this.getUserSoloActivities(userId);
 
     return {
-      completedRides: ridesWithUserData as any[],
+      completedRides: ridesWithUserData,
       soloActivities,
     };
   }
@@ -1377,25 +1548,6 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${soloActivities.userId} = ANY(${participantIds})`);
     
     return activities;
-  }
-
-  async getOrganizerPlannedRides(organizerId: number, date: Date): Promise<Array<Ride>> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    // Get organizer's rides for the date that are NOT completed yet
-    return await db.select()
-      .from(rides)
-      .where(
-        and(
-          eq(rides.organizerId, organizerId),
-          eq(rides.isCompleted, false), // Only show non-completed rides
-          sql`${rides.dateTime} >= ${startOfDay} AND ${rides.dateTime} <= ${endOfDay}`
-        )
-      );
   }
 
   async getOrganizerGpxForRide(rideId: number): Promise<OrganizerGpxFile | undefined> {

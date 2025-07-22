@@ -246,6 +246,18 @@ export default function MyPerformance() {
                   )}
                 </div>
               </div>
+              {userActivityData.xpEarned !== undefined && ( // Check if xpEarned exists
+                 <div className="flex items-center gap-3">
+                    <Trophy className="w-5 h-5 text-yellow-500" /> {/* Using Trophy icon for XP */}
+                    <div>
+                       <p className="font-medium">XP Earned</p>
+                       <p className="text-lg font-bold text-yellow-600">
+                        {/* Ensure xpEarned is treated as a number and format it */}
+                        {parseFloat(userActivityData.xpEarned.toString()).toFixed(2)} XP
+                       </p>
+                    </div>
+                  </div>
+          )}
             </CardContent>
           </Card>
 

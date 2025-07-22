@@ -46,6 +46,8 @@ export default function UploadActivityPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
+  const [autoMatchConfirmationData, setAutoMatchConfirmationData] = useState<any>(null); // Added this state
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -83,11 +85,9 @@ export default function UploadActivityPage() {
     },
     onSuccess: (data) => {
       if (data.type === 'organizer_auto_matched') {
-        toast({
-          title: "Activity uploaded successfully!",
-          description: `Automatically matched to your organized ride: ${data.rideName}`,
-        });
-        navigate("/activities");
+        // Set the auto-match data and show the prompt modal for confirmation
+        setAutoMatchConfirmationData(data);
+        setShowOrganizerPrompt(true); // Reuse the existing modal state
       } else if (data.type === 'organizer_manual_prompt') {
         setOrganizerPromptData(data);
         setShowOrganizerPrompt(true);
@@ -135,6 +135,7 @@ export default function UploadActivityPage() {
       });
       setShowOrganizerPrompt(false);
       setOrganizerPromptData(null);
+      setAutoMatchConfirmationData(null); // Clear auto-match data
       navigate("/activities");
       setIsLinking(false);
     },
@@ -155,12 +156,16 @@ export default function UploadActivityPage() {
   };
 
   const handleLinkToRide = (rideId: number) => {
-    if (!organizerPromptData) return;
+    // Determine which data source to use (manual prompt or auto-match confirmation)
+    const sourceData = organizerPromptData || autoMatchConfirmationData;
+
+    if (!sourceData) return;
+
     setIsLinking(true);
     linkOrganizerGpxMutation.mutate({
       rideId,
-      tempFilePath: organizerPromptData.tempFilePath,
-      gpxData: organizerPromptData.gpxData,
+      tempFilePath: sourceData.tempFilePath,
+      gpxData: sourceData.gpxData,
     });
   };
 
@@ -187,6 +192,7 @@ export default function UploadActivityPage() {
       });
       setShowOrganizerPrompt(false);
       setOrganizerPromptData(null);
+      setAutoMatchConfirmationData(null); // Clear auto-match data
       navigate("/activities");
     })
     .catch(error => {
@@ -282,14 +288,33 @@ export default function UploadActivityPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="w-5 h-5" />
-              Link to Organized Ride?
+              {autoMatchConfirmationData ? 'Confirm Ride Link?' : 'Link to Organized Ride?'}
             </DialogTitle>
             <DialogDescription>
-              I noticed you organized a ride today. Would you like this GPX file to serve as the actual route for your planned ride?
+              {autoMatchConfirmationData ? 
+                `The system automatically matched this activity to your organized ride: "${autoMatchConfirmationData.rideName}". Is this correct?` 
+                : 
+                'I noticed you organized a ride today. Would you like this GPX file to serve as the actual route for your planned ride?'
+              }
             </DialogDescription>
           </DialogHeader>
 
-          {organizerPromptData && (
+          {/* Content based on whether it's auto-match confirmation or manual prompt */}
+          {autoMatchConfirmationData ? (
+            // Auto-match Confirmation Content
+            <div className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Your Activity Data:</strong><br />
+                  Distance: {autoMatchConfirmationData.gpxData?.distance?.toFixed(1) || 'N/A'} km | 
+                  Duration: {formatDuration(autoMatchConfirmationData.gpxData?.duration || 0)} | 
+                  Elevation: {autoMatchConfirmationData.gpxData?.elevationGain?.toFixed(0) || 'N/A'}m
+                </AlertDescription>
+              </Alert>
+            </div>
+          ) : organizerPromptData ? (
+            // Manual Prompt Content
             <div className="space-y-4">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
@@ -336,16 +361,36 @@ export default function UploadActivityPage() {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={handleUploadAsSolo}
-              disabled={isUploading}
-            >
-              Upload as Solo Activity
-            </Button>
+            {autoMatchConfirmationData ? (
+              // Buttons for Auto-match Confirmation
+              <>
+                <Button
+                  onClick={() => handleLinkToRide(autoMatchConfirmationData.rideId)}
+                  disabled={isLinking}
+                >
+                  {isLinking ? 'Linking...' : 'Yes, Link'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleUploadAsSolo}
+                  disabled={isUploading}
+                >
+                  No, Upload as Solo Activity
+                </Button>
+              </>
+            ) : (organizerPromptData && (
+              // Buttons for Manual Prompt
+              <Button
+                variant="outline"
+                onClick={handleUploadAsSolo}
+                disabled={isUploading}
+              >
+                Upload as Solo Activity
+              </Button>
+            ))}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -32,7 +32,10 @@ export default function Home() {
       const params = new URLSearchParams(filters as any);
       const response = await fetch(`/api/rides?${params}`);
       if (!response.ok) throw new Error("Failed to fetch rides");
-      return response.json();
+      const allRides = await response.json();
+      // Filter out completed rides
+      const nonCompletedRides = allRides.filter((ride: any) => !ride.isCompleted);
+      return nonCompletedRides;
     },
   });
 
@@ -356,7 +359,7 @@ export default function Home() {
         >
           <Plus className="w-6 h-6" />
         </Button>
-      </div>
+      }
 
       {/* Leave Ride Confirmation Modal */}
       <LeaveRideModal

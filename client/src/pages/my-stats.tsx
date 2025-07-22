@@ -22,6 +22,51 @@ import {
   ExternalLink
 } from "lucide-react";
 
+// Helper function to calculate the total XP needed to reach the start of a given level (Level 1 starts at 0 XP)
+const getTotalXpForLevel = (level: number): number => {
+  // Define the XP thresholds for the start of each level
+  const xpThresholds: { [key: number]: number } = {
+    1: 0,      // Starter
+    2: 151,    // Cruiser
+    3: 751,    // Pacer
+    4: 2501,   // Climber
+    5: 6001,   // Veteran
+    6: 13001,  // Champion
+    7: 25001,  // Master
+    8: 40001,  // Legend
+    9: 60001,  // Elite (This is the start of Elite, it goes up from here)
+  };
+  return xpThresholds[level] !== undefined ? xpThresholds[level] : Infinity; // Return Infinity for levels beyond defined
+};
+
+// Helper function to calculate user level based on total XP using the defined thresholds
+const calculateLevel = (xp: number): number => {
+  if (xp < 0) return 1; // XP cannot be negative, default to level 1
+
+  let level = 1;
+  // Increment level until the total XP required to reach the *next* level is greater than the user's current XP
+  while (getTotalXpForLevel(level + 1) <= xp) {
+    level++;
+  }
+  return level;
+};
+
+// Helper function to get the level name based on the level number
+const getLevelName = (level: number): string => {
+  const levelNames: { [key: number]: string } = {
+    1: "Starter",
+    2: "Cruiser",
+    3: "Pacer",
+    4: "Climber",
+    5: "Veteran",
+    6: "Champion",
+    7: "Master",
+    8: "Legend",
+    9: "Elite",
+  };
+  return levelNames[level] || `Level ${level}`; // Return "Level X" if name not defined
+};
+
 export default function MyStats() {
   const [timeframe, setTimeframe] = useState("last-month");
   const [showAllRides, setShowAllRides] = useState(false);
@@ -83,6 +128,22 @@ export default function MyStats() {
     { value: "last-year", label: "Last Year" },
     { value: "all-time", label: "All Time" }
   ];
+    // Add these new calculations using the updated non-linear logic
+    const currentLevel = stats?.totalXp !== undefined ? calculateLevel(stats.totalXp) : 1; // Default to level 1 if no XP
+    const xpForStartOfCurrentLevel = getTotalXpForLevel(currentLevel);
+    const xpForStartOfNextLevel = getTotalXpForLevel(currentLevel + 1); // This will be Infinity for Elite level
+
+    const xpIntoCurrentLevel = stats?.totalXp !== undefined ? stats.totalXp - xpForStartOfCurrentLevel : 0;
+    // Ensure xpIntoCurrentLevel is not negative
+    const safeXpIntoCurrentLevel = Math.max(0, xpIntoCurrentLevel);
+
+    const totalXpForCurrentLevelRange = xpForStartOfNextLevel - xpForStartOfCurrentLevel;
+
+    // Calculate the percentage progress in the current level
+    // Handle division by zero and Infinity for Elite level
+    const levelProgressPercentage = totalXpForCurrentLevelRange > 0 && totalXpForCurrentLevelRange !== Infinity
+      ? (safeXpIntoCurrentLevel / totalXpForCurrentLevelRange) * 100
+      : 0; // If range is 0 or Infinity, progress is 0 (or maxed for Elite)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,6 +194,56 @@ export default function MyStats() {
             ))
           ) : (
             <>
+                            <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-500" /> {/* Using Trophy icon */}
+                    Total XP
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {stats?.totalXp !== undefined ? ( // Check if totalXp exists in the fetched stats
+                    <>
+                      <div className="text-2xl font-bold text-gray-900">{stats.totalXp.toFixed(2)}</div> {/* Format to 2 decimal places */}
+                      <p className="text-sm text-gray-500">
+                       Level {currentLevel}: {getLevelName(currentLevel)} {/* Display Level number and name */}
+                      </p>
+                      </>
+                     ) : (
+                      <div className="text-2xl font-bold text-gray-900">N/A</div> // Display N/A if XP is not available
+                    )}
+    
+                  {/* You might also want to show XP change if your backend provides it */}
+                  {/* {stats?.totalXpChange !== undefined && (
+                    <Badge variant="secondary" className="mt-1">
+                      {stats.totalXpChange >= 0 ? '+' : ''}{stats.totalXpChange.toFixed(2)} from previous
+                    </Badge>
+                  )} */}
+                </CardContent>
+                {stats?.totalXp !== undefined && ( // Only show if stats and totalXp are available
+                  <div className="px-6 pb-4"> {/* Add padding to align with CardContent */}
+                   {currentLevel < 9 ? ( // Show progress bar if not Elite level
+                      <>
+                        <p className="text-xs text-gray-500 mb-1">Progress to Level {currentLevel + 1}</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                         <div
+                           className="bg-yellow-500 h-2 rounded-full"
+                            style={{ width: `${levelProgressPercentage}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-right text-xs text-gray-600 mt-1">
+                            {/* Use the correct variables for progress display */}
+                            {safeXpIntoCurrentLevel.toFixed(0)} / {(totalXpForCurrentLevelRange).toFixed(0)} XP
+                          </p>
+                        </>
+                     ) : (
+                      <div className="text-center text-sm font-medium text-gray-600"> {/* Message for Elite level */}
+                        Maximum Level Reached!
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
