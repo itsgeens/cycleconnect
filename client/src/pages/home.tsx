@@ -359,7 +359,7 @@ export default function Home() {
         >
           <Plus className="w-6 h-6" />
         </Button>
-      }
+      
 
       {/* Leave Ride Confirmation Modal */}
       <LeaveRideModal
@@ -370,5 +370,6 @@ export default function Home() {
         rideName={selectedRide?.name}
       />
     </div>
+    </div> 
   );
 }
