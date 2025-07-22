@@ -28,7 +28,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configure multer for GPX file uploads
 import { supabase } from './supabase';
 import { StorageEngine } from 'multer';
-import { Request } from 'express';
 import { File } from 'buffer';
 
 class SupabaseStorage implements StorageEngine {
@@ -856,7 +855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Parse GPX file to extract activity data
       const gpxData = await parseGPXFile(file.path);
-      
+      console.log('gpxData after parsing:', gpxData); // Add this log
+
       // Validate GPX data has valid start time
       if (!gpxData.startTime || isNaN(gpxData.startTime.getTime())) {
         return res.status(400).json({ message: "Invalid GPX file: missing or malformed timestamp data" });
@@ -872,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Try auto-matching first
         const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
-        
+        console.log('Calling proximityMatcher.matchOrganizerGpx with gpxData:', gpxData); // Add this log
         if (autoMatch) {
           // Auto-match successful - process as organizer GPX
           const organizerGpx = await storage.createOrganizerGpx({
@@ -897,7 +897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Process participant proximity matching
           await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
-          
+          console.log('Calling processParticipantMatching after auto-match'); // Add this log
           return res.json({
             type: 'organizer_auto_matched',
             message: `Automatically matched to your organized ride "${autoMatch.rideName}"`,
@@ -976,6 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           if (rideGpxData) {
+            console.log('Calling calculateRouteMatch with gpxData and rideGpxData:', { gpxData, rideGpxData }); // Add this log
             const matchScore = calculateRouteMatch(gpxData, rideGpxData);
             console.log(`Ride ${ride.name} match score: ${matchScore}`);
             
@@ -1035,6 +1036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // No match found - create a solo activity automatically
+        console.log('No ride match found, creating solo activity with gpxData:', gpxData); // Add this log
         const soloActivity = await storage.createSoloActivity({
           name: `Manual Activity - ${new Date().toLocaleDateString()}`,
           description: `Solo cycling activity uploaded manually`,
@@ -1221,7 +1223,7 @@ if (activity.gpxFilePath) {
         
         // Process participant proximity matching
         await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
-        
+        console.log('Calling processParticipantMatching after auto-match'); // Add this log
         res.json({
           message: `Auto-matched to ride "${autoMatch.rideName}" with ${autoMatch.matchScore.toFixed(1)}% similarity`,
           organizerGpx,
