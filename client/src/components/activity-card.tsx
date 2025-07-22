@@ -165,10 +165,10 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
       <div className="relative">
         {/* GPX Map Preview */}
         <GPXMapPreview
-          gpxUrl={`/api/gpx/${activity.gpxFilePath?.split('/').pop()}`}
+          gpxUrl={activity.gpxFilePath?.split('/').pop()} // Removed '/api/gpx/' and template literal
           className="h-48"
           interactive={false}
-          stats={stats} // Add this line
+          stats={stats}
         />
         
         {/* Activity Type Badge */}
