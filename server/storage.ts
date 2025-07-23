@@ -607,11 +607,14 @@ export class DatabaseStorage implements IStorage {
         const organizingBonusXp = 50; // Example bonus XP for organizing
 
         const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + organizingBonusXp);
+        
+        // Round the earned XP to the nearest integer
+        const roundedEarnedXp = Math.round(earnedXp); // Add this line
 
-         if (earnedXp > 0) {
-            console.log(`[completeRide] Calculated ${earnedXp.toFixed(2)} XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}).`);
-            await this.incrementUserXP(userId, earnedXp); // userId is the organizerId
-            console.log(`[completeRide] Added ${earnedXp.toFixed(2)} XP to organizer ${userId}.`);
+         if (roundedEarnedXp > 0) {
+            console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}).`);
+            await this.incrementUserXP(userId, roundedEarnedXp); // userId is the organizerId
+            console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to organizer ${userId}.`);
          } else {
              console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}). Skipping XP increment.`);
          }
@@ -1233,8 +1236,11 @@ export class DatabaseStorage implements IStorage {
     // Calculate XP: distance + elevation + speed (using the revised multiplier)
     const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
 
+    // Round the earned XP to the nearest integer
+    const roundedEarnedXp = Math.round(earnedXp); // Add this line
+
     // Add XP to the user
-    await this.incrementUserXP(newActivity.userId, earnedXp);
+    await this.incrementUserXP(newActivity.userId, roundedEarnedXp);
 
     return newActivity;
   }
