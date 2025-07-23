@@ -207,7 +207,10 @@ function toRadians(degrees: number): number {
 
 // Simple route matching algorithm
 export function calculateRouteMatch(gpxData1: GpxData, gpxData2: GpxData): number {
+  console.log('Inside calculateRouteMatch - gpxData1:', gpxData1); // Add this log
+  console.log('Inside calculateRouteMatch - gpxData2:', gpxData2); // Add this log
   if (!gpxData1.trackPoints.length || !gpxData2.trackPoints.length) {
+      console.log('Inside calculateRouteMatch - one or both trackPoints arrays are empty or undefined'); // Log if arrays are empty/undefined
     return 0;
   }
 
