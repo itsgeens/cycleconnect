@@ -843,37 +843,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GPX upload route with activity matching
   app.post("/api/upload-activity", requireAuth, upload.single("gpx"), async (req, res) => {
+    console.log('--- Starting /api/upload-activity endpoint execution ---'); // Add this very first log
     try {
       const userId = req.userId!;
       const file = req.file;
       
       if (!file) {
+        console.log('No GPX file provided'); // Log inside the if condition
         return res.status(400).json({ message: "No GPX file provided" });
       }
-
+      console.log('GPX file provided:', file.originalname); // Log after the if condition
       const { deviceName, deviceType, isOrganizerOverride } = req.body;
-      
+      console.log('Request body:', req.body); // Log the request body
+
       // Parse GPX file to extract activity data
+      console.log('Before calling parseGPXFile'); // Add this log
       const gpxData = await parseGPXFile(file.path);
       console.log('gpxData after parsing:', gpxData); // Add this log
 
       // Validate GPX data has valid start time
       if (!gpxData.startTime || isNaN(gpxData.startTime.getTime())) {
+        console.log('Invalid GPX file: missing or malformed timestamp data'); // Log inside the if condition
         return res.status(400).json({ message: "Invalid GPX file: missing or malformed timestamp data" });
       }
-      
+      console.log('GPX data validated'); // Log after validation
       // Check if user has organized rides on the same date FIRST
-      const activityDate = new Date(gpxData.startTime);
+      const activityDate = new Date(gpxData.startTime as Date);
+      console.log('Activity date:', activityDate); // Log activity date
       const plannedRides = await storage.getOrganizerPlannedRides(userId, activityDate);
-      
+      console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
       // If user has organized rides on this date, check for auto-match or prompt for manual override
       if (plannedRides.length > 0 && !isOrganizerOverride) {
         console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
-        
+        console.log('Attempting auto-match with organized rides'); // Log before auto-match
         // Try auto-matching first
         console.log('Before calling proximityMatcher.matchOrganizerGpx'); // Add this log
         const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
         console.log('Calling proximityMatcher.matchOrganizerGpx with gpxData:', gpxData); // Add this log
+
         if (autoMatch) {
           // Auto-match successful - process as organizer GPX
           const organizerGpx = await storage.createOrganizerGpx({
@@ -909,6 +916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           // No auto-match - prompt user for manual decision
+          console.log('No auto-match found, prompting for manual linking'); // Log before manual prompt
           return res.json({
             type: 'organizer_manual_prompt',
             message: 'I noticed you organized a ride today. Would you like this GPX file to serve as the actual route for your planned ride?',
@@ -965,7 +973,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // First try to parse the original planned route GPX
           let rideGpxData = null;
           try {
+            console.log(`Attempting to parse planned route GPX for ride ${ride.id}: ${ride.gpxFilePath}`); // Log before parsing planned route
             rideGpxData = await parseGPXFile(ride.gpxFilePath);
+            console.log(`Successfully parsed planned route GPX for ride ${ride.id}`); // Log after successful parsing
           } catch (plannedRouteError) {
             console.warn(`Could not parse planned route GPX for ride ${ride.id}, trying organizer's actual GPX:`, plannedRouteError);
             
@@ -973,13 +983,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const organizerGpx = await storage.getOrganizerGpxForRide(ride.id);
             if (organizerGpx) {
               console.log(`Found organizer's actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`);
+                console.log(`Attempting to parse organizer's actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`); // Log before parsing organizer's GP
               rideGpxData = await parseGPXFile(organizerGpx.gpxFilePath);
+                console.log(`Successfully parsed organizer's actual GPX for ride ${ride.id}`); // Log after successful parsing
             }
           }
           
           if (rideGpxData) {
             console.log('Calling calculateRouteMatch with gpxData and rideGpxData:', { gpxData, rideGpxData }); // Add this log
             const matchScore = calculateRouteMatch(gpxData, rideGpxData);
+            console.log('After calling calculateRouteMatch, matchScore:', matchScore); // Log after calculateRouteMatch
             console.log(`Ride ${ride.name} match score: ${matchScore}`);
             
             if (matchScore > bestMatchScore && matchScore >= 0.5) {
@@ -995,10 +1008,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (bestMatch && bestMatchScore >= 0.5) {
+        console.log(`Match found for ride ${bestMatch.id} with score ${bestMatchScore}`); // Log when match is found
         // Check if user already has activity data for this ride
         const existingActivity = await storage.getUserActivityForRide(bestMatch.id, userId);
         
         if (existingActivity) {
+          console.log(`Existing activity found for ride ${bestMatch.id}, updating`); // Log when existing activity is found
           // User already has activity data for this ride, just update it
           res.json({
             message: "Activity updated for matched ride!",
@@ -1007,29 +1022,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             existing: true,
           });
         } else {
+          console.log(`No existing activity found for ride ${bestMatch.id}, creating new activity match`); // Log when creating new activity match
           // Match found - complete the ride if not already completed
           if (!bestMatch.isCompleted) {
+              console.log(`Ride ${bestMatch.id} is not completed, marking as completed`); // Log before completing ride
             await storage.completeRide(bestMatch.id, userId);
+            console.log(`Ride ${bestMatch.id} marked as completed`); // Log after completing ride
           }
           
           // Create activity match record
+          console.log('Before creating activity match record'); // Log before creating activity match
           await storage.createActivityMatch({
             rideId: bestMatch.id,
             userId,
             deviceId: deviceName || 'manual-upload',
             routeMatchPercentage: (bestMatchScore * 100).toFixed(2),
             gpxFilePath: file.path,
-            distance: gpxData.distance,
-            duration: gpxData.duration,
+            distance: gpxData.distance?.toString() ?? null,
+            duration: gpxData.duration ?? null,
             movingTime: gpxData.movingTime,
-            elevationGain: gpxData.elevationGain,
-            averageSpeed: gpxData.averageSpeed,
-            averageHeartRate: gpxData.averageHeartRate,
-            maxHeartRate: gpxData.maxHeartRate,
-            calories: gpxData.calories,
+            elevationGain: gpxData.elevationGain?.toString() ?? null,
+            averageSpeed: gpxData.averageSpeed?.toString() ?? null,
+            averageHeartRate: gpxData.averageHeartRate ?? null,
+            maxHeartRate: gpxData.maxHeartRate ?? null, 
+            calories: gpxData.calories ?? null,
             completedAt: new Date(),
           });
-          
+          console.log('After creating activity match record'); // Log after creating activity match
+
           res.json({
             message: "Activity matched and ride completed!",
             matchedRide: bestMatch,
@@ -1039,6 +1059,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // No match found - create a solo activity automatically
         console.log('No ride match found, creating solo activity with gpxData:', gpxData); // Add this log
+        
+         // Add a check for req.file here
+         if (!req.file) {
+          console.error('Error creating solo activity: req.file is undefined'); // Log the error
+          // Decide how to handle this case:
+          // - Return an error response to the client
+          // - Throw an error to be caught by the outer catch block
+          return res.status(500).json({ message: "Error processing uploaded file for solo activity" });
+         }
+        
         const soloActivity = await storage.createSoloActivity({
           name: `Manual Activity - ${new Date().toLocaleDateString()}`,
           description: `Solo cycling activity uploaded manually`,
@@ -1057,6 +1087,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedAt: new Date(),
           userId,
         });
+          console.log('Solo activity created:', soloActivity); // Log created solo activity
+
 
         res.json({
           message: "Solo activity created successfully", 
