@@ -949,8 +949,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Before filtering userRides.joined, userRides.joined:', userRides?.joined);
      
-       // Add a check here to ensure userRides.joined is a valid array
-       const joinedRides = userRides?.joined || []; // Use nullish coalescing to provide an empty array if userRides.joined is null or undefined
+      // Add a more robust check here
+      const joinedRides = (userRides && Array.isArray(userRides.joined)) ? userRides.joined : [];
+      console.log('After robust check, joinedRides:', joinedRides); // Add this log 
      
       const currentTime = new Date();
       const activityStartTime = new Date(gpxData.startTime);
@@ -966,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return timeDiff <= timeWindowMs; // Remove the isCompleted filter to include completed rides
       });
       console.log('After filtering joinedRides, candidateRides:', candidateRides); // Add this log
-      
+
       // Debug: Log available rides for matching
       console.log('Available rides for matching:', candidateRides.map(r => ({
         id: r.id,
