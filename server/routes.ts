@@ -869,15 +869,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid GPX file: missing or malformed timestamp data" });
       }
       console.log('GPX data validated'); // Log after validation
+
       // Check if user has organized rides on the same date FIRST
       const activityDate = new Date(gpxData.startTime as Date);
       console.log('Activity date:', activityDate); // Log activity date
       const plannedRides = await storage.getOrganizerPlannedRides(userId, activityDate);
       console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
+      
       // If user has organized rides on this date, check for auto-match or prompt for manual override
       if (plannedRides.length > 0 && !isOrganizerOverride) {
         console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
         console.log('Attempting auto-match with organized rides'); // Log before auto-match
+        
         // Try auto-matching first
         console.log('Before calling proximityMatcher.matchOrganizerGpx'); // Add this log
         const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
@@ -940,7 +943,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Try to match with existing joined rides within a reasonable time window
+      console.log('Before calling storage.getUserRides');
       const userRides = await storage.getUserRides(userId);
+      console.log('After calling storage.getUserRides, userRides:', userRides); 
+      console.log('Before filtering userRides.joined, userRides.joined:', userRides?.joined);
       const currentTime = new Date();
       const activityStartTime = new Date(gpxData.startTime);
       
