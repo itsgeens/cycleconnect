@@ -961,7 +961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timeWindowHours = 24;
       const timeWindowMs = timeWindowHours * 60 * 60 * 1000;
       
-      const candidateRides = userRides.joined.filter(ride => {
+      const candidateRides = joinedRides.filter(ride => {
         const rideDateTime = new Date(ride.dateTime);
         const timeDiff = Math.abs(activityStartTime.getTime() - rideDateTime.getTime());
         return timeDiff <= timeWindowMs; // Remove the isCompleted filter to include completed rides
