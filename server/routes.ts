@@ -853,6 +853,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No GPX file provided" });
       }
       console.log('GPX file provided:', file.originalname); // Log after the if condition
+      console.log('GPX file path:', file.path); // Log the file.path property
+      
       const { deviceName, deviceType, isOrganizerOverride } = req.body;
       console.log('Request body:', req.body); // Log the request body
 
