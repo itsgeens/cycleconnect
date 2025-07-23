@@ -871,6 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
         
         // Try auto-matching first
+        console.log('Before calling proximityMatcher.matchOrganizerGpx'); // Add this log
         const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
         console.log('Calling proximityMatcher.matchOrganizerGpx with gpxData:', gpxData); // Add this log
         if (autoMatch) {
@@ -896,6 +897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.completeRide(autoMatch.rideId, userId);
           
           // Process participant proximity matching
+          console.log('Before calling processParticipantMatching after auto-match'); // Add this log
           await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
           console.log('Calling processParticipantMatching after auto-match'); // Add this log
           return res.json({
