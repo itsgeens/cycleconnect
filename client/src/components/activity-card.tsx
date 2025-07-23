@@ -225,6 +225,19 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
               </>
             )}
 
+            {activity.xpEarned !== undefined && ( // Check if xpEarned exists
+              <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-yellow-500" /> {/* Using Trophy icon for XP */}
+                  <div>
+                    <p className="text-xs text-gray-500">XP Earned</p>
+                    <p className="font-medium">
+                  {/* Ensure xpEarned is treated as a number and format it */}
+                  {parseFloat(activity.xpEarned.toString()).toFixed(2)} XP
+                    </p>
+                  </div>
+              </div>
+        )}
+
             {activity.description && (
               <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                 {activity.description}

@@ -129,11 +129,11 @@ export default function MyStats() {
     { value: "all-time", label: "All Time" }
   ];
     // Add these new calculations using the updated non-linear logic
-    const currentLevel = stats?.totalXp !== undefined ? calculateLevel(stats.totalXp) : 1; // Default to level 1 if no XP
+    const currentLevel = stats?.xp !== undefined ? calculateLevel(stats.totalXp) : 1; // Default to level 1 if no XP
     const xpForStartOfCurrentLevel = getTotalXpForLevel(currentLevel);
     const xpForStartOfNextLevel = getTotalXpForLevel(currentLevel + 1); // This will be Infinity for Elite level
 
-    const xpIntoCurrentLevel = stats?.totalXp !== undefined ? stats.totalXp - xpForStartOfCurrentLevel : 0;
+    const xpIntoCurrentLevel = stats?.xp !== undefined ? stats.xp - xpForStartOfCurrentLevel : 0;
     // Ensure xpIntoCurrentLevel is not negative
     const safeXpIntoCurrentLevel = Math.max(0, xpIntoCurrentLevel);
 
@@ -194,7 +194,7 @@ export default function MyStats() {
             ))
           ) : (
             <>
-                            <Card>
+              <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-yellow-500" /> {/* Using Trophy icon */}
@@ -202,7 +202,7 @@ export default function MyStats() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {stats?.totalXp !== undefined ? ( // Check if totalXp exists in the fetched stats
+                  {stats?.xp !== undefined ? ( // Check if totalXp exists in the fetched stats
                     <>
                       <div className="text-2xl font-bold text-gray-900">{stats.totalXp.toFixed(2)}</div> {/* Format to 2 decimal places */}
                       <p className="text-sm text-gray-500">
@@ -220,7 +220,7 @@ export default function MyStats() {
                     </Badge>
                   )} */}
                 </CardContent>
-                {stats?.totalXp !== undefined && ( // Only show if stats and totalXp are available
+                {stats?.xp !== undefined && ( // Only show if stats and totalXp are available
                   <div className="px-6 pb-4"> {/* Add padding to align with CardContent */}
                    {currentLevel < 9 ? ( // Show progress bar if not Elite level
                       <>

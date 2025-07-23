@@ -84,6 +84,7 @@ export const organizerGpxFiles = pgTable("organizer_gpx_files", {
   calories: integer("calories"),
   linkedAt: timestamp("linked_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  xpEarned: integer("xp_earned").default(0),
 });
 
 // Table for participant proximity matches to organizer's actual ride
@@ -266,6 +267,7 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
   deviceName: true,
   deviceType: true,
   completedAt: true,
+  xp: true,
 }).extend({
   activityType: z.enum(["cycling", "running", "walking", "other"]),
   deviceType: z.enum(["cycling_computer", "smartwatch", "phone", "manual"]).optional(),
@@ -311,6 +313,7 @@ export const activityMatches = pgTable("activity_matches", {
   calories: integer("calories"),
   completedAt: timestamp("completed_at").notNull(),
   matchedAt: timestamp("matched_at").defaultNow().notNull(),
+  xpEarned: integer("xp_earned").default(0),
 });
 
 // Zod schemas for device connections

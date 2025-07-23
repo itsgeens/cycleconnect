@@ -581,11 +581,22 @@ export class DatabaseStorage implements IStorage {
         // Calculate XP: distance + elevation + speed (using the revised multiplier)
         // Use Math.max to ensure XP is not negative in case of weird data
         const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1));
+        const roundedEarnedXp = Math.round(earnedXp);
 
-        if (earnedXp > 0) {
-             console.log(`[completeRide] Calculated ${earnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}).`);
-             await this.incrementUserXP(activity.userId, earnedXp);
-             console.log(`[completeRide] Added ${earnedXp.toFixed(2)} XP to user ${activity.userId}.`);
+        if (roundedEarnedXp > 0) {
+             console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}).`);
+             
+             await db.update(activityMatches)
+                     .set({ xpEarned: roundedEarnedXp })
+                     .where(eq(activityMatches.id, activity.id));
+                 console.log(`[completeRide] Saved ${roundedEarnedXp} XP to activityMatches record ${activity.id}.`);
+             
+             await this.incrementUserXP(activity.userId, roundedEarnedXp);
+             console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to user ${activity.userId}.`);
+
+             // Now increment the user's total XP based on the rounded amount saved to the activity match
+             await this.incrementUserXP(activity.userId, roundedEarnedXp);
+             console.log(`[completeRide] Added ${roundedEarnedXp} XP to user ${activity.userId}.`);
         } else {
             console.log(`[completeRide] Calculated 0 XP for participant ${activity.userId} (Activity ${activity.id}). Skipping XP increment.`);
         }
@@ -607,15 +618,21 @@ export class DatabaseStorage implements IStorage {
         const organizingBonusXp = 50; // Example bonus XP for organizing
 
         const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + organizingBonusXp);
-        
-        // Round the earned XP to the nearest integer
         const roundedEarnedXp = Math.round(earnedXp); // Add this line
 
          if (roundedEarnedXp > 0) {
             console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}).`);
+            
+            await db.update(organizerGpxFiles)
+                    .set({ xpEarned: roundedEarnedXp })
+                    .where(eq(organizerGpxFiles.id, organizerGpx.id));
+                console.log(`[completeRide] Saved ${roundedEarnedXp} XP to organizerGpxFiles record ${organizerGpx.id}.`);
+            
             await this.incrementUserXP(userId, roundedEarnedXp); // userId is the organizerId
             console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to organizer ${userId}.`);
-         } else {
+
+         
+          } else {
              console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}). Skipping XP increment.`);
          }
     } else {
@@ -658,6 +675,7 @@ export class DatabaseStorage implements IStorage {
     soloRidesChange: number;
     totalDistanceChange: number;
     totalElevationChange: number;
+    xp: number;
   }> {
     const now = new Date();
     let startDate = new Date();
@@ -718,6 +736,10 @@ export class DatabaseStorage implements IStorage {
         eq(rides.id, activityMatches.rideId),
         eq(activityMatches.userId, userId)
       ))
+      .leftJoin(organizerGpxFiles, and( // ADDED: Join organizerGpxFiles
+        eq(rides.id, organizerGpxFiles.rideId),
+        eq(organizerGpxFiles.organizerId, userId)
+      ))
       .where(
         and(
           sql`${rides.createdAt} >= ${startDate}`,
@@ -757,6 +779,10 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(activityMatches, and(
         eq(rides.id, activityMatches.rideId),
         eq(activityMatches.userId, userId)
+      ))
+      .leftJoin(organizerGpxFiles, and( // ADDED: Join organizerGpxFiles
+        eq(rides.id, organizerGpxFiles.rideId),
+        eq(organizerGpxFiles.organizerId, userId)
       ))
       .where(
         and(
@@ -823,6 +849,8 @@ export class DatabaseStorage implements IStorage {
     // Calculate totals including solo activities
     const totalCurrentDistance = Number(current.totalDistance) + Number(currentSolo.soloDistance);
     const totalCurrentElevation = Number(current.totalElevation) + Number(currentSolo.soloElevation);
+    const [user] = await db.select({ xp: users.xp }).from(users).where(eq(users.id, userId));
+    const currentXP = user?.xp || 0;
     const totalPreviousDistance = Number(previous.totalDistance) + Number(previousSolo.soloDistance);
     const totalPreviousElevation = Number(previous.totalElevation) + Number(previousSolo.soloElevation);
 
@@ -843,6 +871,7 @@ export class DatabaseStorage implements IStorage {
       totalElevationChange: totalCurrentElevation - totalPreviousElevation,
       followersCount,
       followingCount,
+      xp: currentXP, 
     };
   }
 
@@ -1357,6 +1386,7 @@ export class DatabaseStorage implements IStorage {
               calories: organizerGpxData.calories,
               completedAt: organizerGpxData.linkedAt || ride.completedAt,
               matchedAt: organizerGpxData.linkedAt || ride.completedAt,
+              xpEarned: organizerGpxData.xpEarned,
             };
           }
         }
@@ -1383,6 +1413,7 @@ export class DatabaseStorage implements IStorage {
           organizerName: ride.organizerName || 'Unknown',
           participantCount: Number(ride.participantCount), // Ensure number type
           // userActivityData is fetched but NOT included in the completedRides array itself as per the interface
+          xpEarned: finalUserActivityData?.xpEarned,
         };
         console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
         
