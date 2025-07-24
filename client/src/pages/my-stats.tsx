@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import Navbar from "@/components/navbar";
@@ -21,6 +21,18 @@ import {
   UserPlus,
   ExternalLink
 } from "lucide-react";
+
+import type { Ride, ActivityMatch } from "@shared/schema"; // Import necessary types from your shared schema
+
+    // Define a type alias for the completed ride objects returned by the backend
+    type CompletedRideWithData = Ride & {
+      organizerName: string;
+      participantCount: number;
+      completedAt: Date;
+      userActivityData?: ActivityMatch;
+      userParticipationData?: any; // You might want to define a more specific type for userParticipationData
+    };
+
 
 // Helper function to calculate the total XP needed to reach the start of a given level (Level 1 starts at 0 XP)
 const getTotalXpForLevel = (level: number): number => {
@@ -147,8 +159,23 @@ export default function MyStats() {
       ? (safeXpIntoCurrentLevel / totalXpForCurrentLevelRange) * 100
       : 0; // If range is 0 or Infinity, progress is 0 (or maxed for Elite)
 
+      // Derive completed ride counts by type from completedActivities data - ADDED
+  const completedSoloRidesCount = useMemo(() => {
+    return completedRides?.soloActivities?.length || 0;
+}, [completedRides]);
+
+ const completedOrganizedRidesCount = useMemo(() => {
+  return completedRides?.completedRides?.filter((ride: CompletedRideWithData) => ride.organizerId === targetUserId)?.length || 0
+ }, [completedRides, targetUserId]);
+
+ const completedJoinedRidesCount = useMemo(() => {
+  return completedRides?.completedRides?.filter((ride: CompletedRideWithData) => ride.organizerId !== targetUserId)?.length || 0;
+  }, [completedRides, targetUserId]);
+
+  const totalCompletedRides = completedSoloRidesCount + completedOrganizedRidesCount + completedJoinedRidesCount;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50"> {/* Outer div 1 */}
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -160,6 +187,7 @@ export default function MyStats() {
             {isOwnStats ? "Track your cycling achievements and progress" : `View ${stats?.user?.name || "this user"}'s cycling achievements and progress`}
           </p>
         </div>
+
 
         {/* Time Frame Selector */}
         <div className="mb-8">
@@ -180,37 +208,52 @@ export default function MyStats() {
           </div>
         </div>
 
-      {/* Stats Cards */}
-      {/* Modified grid layout: first card spans all columns */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 mb-8">
-        {statsLoading ? (
-          // Keep skeleton loaders, but adjust for the new layout if necessary
-          <>
-            <Card className="lg:col-span-3"> {/* Skeleton for the large XP card */}
-              <CardHeader className="pb-2">
-                <Skeleton className="h-6 w-32 mb-2" />
-                <Skeleton className="h-4 w-48" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-24 mb-4" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-1/2 mt-2" />
-            </CardContent>
-         </Card>
-        {Array.from({ length: 5 }).map((_, i) => ( // Skeletons for the remaining smaller cards
-          <Card key={i}>
+        {/* Full-width XP Card */}
+        <Card className="w-full mb-8"> {/* Ensure it's full width */}
             <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-8 w-16 mb-2" />
-            <Skeleton className="h-3 w-20" />
-          </CardContent>
-        </Card>
-      ))}
-    </>
-  ) : (
-    <>
+              <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                  Total XP
+              </CardTitle>
+            </CardHeader>
+
+
+
+            <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between">
+              <div className="mb-4 md:mb-0">
+                {statsLoading ? ( // Add loading state for XP
+                    <Skeleton className="h-10 w-32 mb-1" />
+                ) : stats?.xp !== undefined ? (
+                  <>
+                    <div className="text-4xl font-bold text-gray-900 mb-1">{stats.xp.toFixed(2)}</div>
+                    <p className="text-lg text-gray-600">
+                      Level {currentLevel}: {getLevelName(currentLevel)}
+                    </p>
+                  </>
+                ) : (
+                  <div className="text-4xl font-bold text-gray-900">N/A</div>
+                )}
+              </div>
+
+              {statsLoading ? ( // Add loading state for progress bar
+                 <Skeleton className="h-10 w-full md:w-1/2 lg:w-1/3" />
+              ) : stats?.xp !== undefined && currentLevel < 9 && (
+                 <div className="w-full md:w-1/2 lg:w-1/3">
+                   <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p>
+                   <div className="w-full bg-gray-200 rounded-full h-3">
+                     <div
+                       className="bg-yellow-500 h-3 rounded-full"
+                        style={{ width: `${levelProgressPercentage}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-right text-sm text-gray-700 mt-1">
+                        {safeXpIntoCurrentLevel.toFixed(0)} / {(totalXpForCurrentLevelRange).toFixed(0)} XP
+                      </p>
+                    </div>
+                 )}
+            </CardContent>
+          </Card>
+         ) : (
              {/* Full-width XP Card */}
             <Card className="lg:col-span-3"> {/* This card spans all 3 columns on large screens */}
               <CardHeader className="pb-2">
@@ -219,6 +262,7 @@ export default function MyStats() {
                   Total XP
               </CardTitle>
             </CardHeader>
+
             <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between"> {/* Use flexbox for layout */}
               <div className="mb-4 md:mb-0"> {/* Spacing for smaller screens */}
                 {stats?.xp !== undefined ? (
@@ -250,89 +294,108 @@ export default function MyStats() {
                   </p>
                 </div>
              )}
-        </CardContent>
-      </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Rides Joined
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stats?.ridesJoined || 0}</div>
-                  <Badge variant="secondary" className="mt-1">
-                    {stats?.ridesJoinedChange >= 0 ? '+' : ''}{stats?.ridesJoinedChange || 0} from previous
-                  </Badge>
-                </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
 
-              <Card>
+            {/* Second Row: Ride Count (2x2), Total Distance (1x3), Total Elevation (1x3) */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8"> {/* Using a 5-column grid */}
+            {/* Ride Count Card (2x2) */}
+            <Card className="md:col-span-2 md:row-span-2"> {/* Spans 2 columns and 2 rows on medium screens and up */}
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Trophy className="h-4 w-4" />
-                    Rides Hosted
-                  </CardTitle>
+                    <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                        <Activity className="h-6 w-6 text-blue-500" />
+                        Ride Count
+                    </CardTitle>
+                    <CardDescription>(Completed Activities)</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stats?.ridesHosted || 0}</div>
-                  <Badge variant="secondary" className="mt-1">
-                    {stats?.ridesHostedChange >= 0 ? '+' : ''}{stats?.ridesHostedChange || 0} from previous
-                  </Badge>
+                <CardContent className="flex flex-col items-center justify-center h-full"> {/* Center content */}
+                    {ridesLoading ? ( // Loading state for donut chart
+                        <Skeleton className="h-40 w-40 rounded-full" />
+                    ) : (
+                       <>
+                         {/* Placeholder for your DonutChart component */}
+                         {/* <DonutChart
+                             data={[
+                                 { name: 'Solo Activities', value: completedSoloRidesCount },
+                                 { name: 'Organized Rides', value: completedOrganizedRidesCount },
+                                 { name: 'Joined Rides', value: completedJoinedRidesCount },
+                             ]}
+                             innerRadius={60} // Adjust as needed
+                             outerRadius={80} // Adjust as needed
+                             fill="#8884d8" // Adjust as needed
+                             paddingAngle={2} // Adjust as needed
+                             dataKey="value"
+                         /> */}
+                         {/* Simple text representation if chart not available */}
+                         <div className="text-center">
+                             <div className="text-5xl font-bold text-gray-900 mb-2">{totalCompletedRides}</div> {/* Total in center */}
+                             <p className="text-sm text-gray-600">Total Completed Rides</p>
+                             {/* Basic breakdown list */}
+                             <div className="mt-4 text-left text-sm text-gray-700 space-y-1">
+                                 <p>Breakdown:</p>
+                                 <p>- Solo: {completedSoloRidesCount}</p>
+                                 <p>- Organized: {completedOrganizedRidesCount}</p>
+                                 <p>- Joined: {completedJoinedRidesCount}</p>
+                             </div>
+                         </div>
+                       </>
+                    )}
                 </CardContent>
-              </Card>
+            </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Solo Rides
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stats?.soloRides || 0}</div>
-                  <Badge variant="secondary" className="mt-1">
-                    {stats?.soloRidesChange >= 0 ? '+' : ''}{stats?.soloRidesChange || 0} from previous
-                  </Badge>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Route className="h-4 w-4" />
-                    Total Distance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stats?.totalDistance || 0} km</div>
-                  <Badge variant="secondary" className="mt-1">
-                    {stats?.totalDistanceChange >= 0 ? '+' : ''}{stats?.totalDistanceChange || 0} km from previous
-                  </Badge>
-                </CardContent>
-              </Card>
+            {/* Total Distance Card (1x3) */}
+            <Card className="md:col-span-3"> {/* Spans 3 columns on medium screens and up */}
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                  <Route className="h-6 w-6 text-green-500" />
+                  Total Distance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? ( // Loading state for distance
+                    <Skeleton className="h-8 w-24 mb-2" />
+                ) : (
+                   <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.totalDistance || 0} km</div>
+                )}
+                {statsLoading ? ( // Loading state for distance change
+                    <Skeleton className="h-4 w-20" />
+                ) : (
+                   <Badge variant="secondary">
+                     {stats?.totalDistanceChange >= 0 ? '+' : ''}{stats?.totalDistanceChange || 0} km from previous
+                   </Badge>
+                )}
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Mountain className="h-4 w-4" />
-                    Total Elevation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">{stats?.totalElevation || 0} m</div>
-                  <Badge variant="secondary" className="mt-1">
-                    {stats?.totalElevationChange >= 0 ? '+' : ''}{stats?.totalElevationChange || 0} m from previous
-                  </Badge>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
+               {/* Total Elevation Card (1x3) */}
+            <Card className="md:col-span-3"> {/* Spans 3 columns on medium screens and up */}
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                  <Mountain className="h-6 w-6 text-purple-500" />
+                  Total Elevation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                 {statsLoading ? ( // Loading state for elevation
+                    <Skeleton className="h-8 w-24 mb-2" />
+                 ) : (
+                   <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.totalElevation || 0} m</div>
+                 )}
+                 {statsLoading ? ( // Loading state for elevation change
+                    <Skeleton className="h-4 w-20" />
+                 ) : (
+                   <Badge variant="secondary">
+                     {stats?.totalElevationChange >= 0 ? '+' : ''}{stats?.totalElevationChange || 0} m from previous
+                   </Badge>
+                 )}
+              </CardContent>
+            </Card>
+         </div>
 
-        {/* Social Stats Section */}
-        <div className="grid gap-6 md:grid-cols-2 mb-8">
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${targetUserId}`)}>
+        {/* Third Row: Full-width Followers and Following Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"> {/* Using a 2-column grid for this section */}
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow md:col-span-1"> {/* Spans 1 column on medium screens and up */}
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -341,12 +404,16 @@ export default function MyStats() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
+               {statsLoading ? ( // Loading state for followers
+                  <Skeleton className="h-8 w-16" />
+               ) : (
+                 <div className="text-2xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
+               )}
               <p className="text-sm text-gray-500">People following {isOwnStats ? 'you' : stats?.user?.name || 'them'}</p>
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(`/followers/${targetUserId}`)}>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow md:col-span-1"> {/* Spans 1 column on medium screens and up */}
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
@@ -355,7 +422,11 @@ export default function MyStats() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
+              {statsLoading ? ( // Loading state for following
+                  <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
+              )}
               <p className="text-sm text-gray-500">People {isOwnStats ? "you're" : `${stats?.user?.name || 'they are'}`} following</p>
             </CardContent>
           </Card>
@@ -384,15 +455,16 @@ export default function MyStats() {
                   </div>
                 ))}
               </div>
-            ) : completedRides?.length > 0 ? (
+              ) : (completedRides?.completedRides?.length > 0 || completedRides?.soloActivities?.length > 0) ? ( // Correctly check if either array has data
               <>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {completedRides.map((ride: any) => (
+                  {/* Map over the completed group rides */}
+                  {completedRides?.completedRides?.map((ride: CompletedRideWithData) => (
                     <RideCard key={ride.id} ride={ride} />
                   ))}
                 </div>
                 
-                {!showAllRides && completedRides.length >= 5 && (
+                {!showAllRides && ((completedRides?.completedRides?.length || 0) + (completedRides?.soloActivities?.length || 0)) >= 5 && (
                   <div className="text-center mt-6">
                     <Button 
                       variant="outline" 
@@ -418,6 +490,5 @@ export default function MyStats() {
         </Card>
         )}
       </div>
-    </div>
-  );
-}
+      </div>
+  )}
