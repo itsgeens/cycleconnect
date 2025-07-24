@@ -849,7 +849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const file = req.file;
       
       if (!file) {
-        console.log('No GPX file provided'); // Log inside the if condition
+        console.log('No GPX file provided'); 
         return res.status(400).json({ message: "No GPX file provided" });
       }
       console.log('GPX file provided:', file.originalname); // Log after the if condition
@@ -870,6 +870,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log('GPX data validated'); // Log after validation
 
+      // Calculate XP breakdown from GPX data - ADDED
+      const distance = gpxData.distance || 0;
+      const elevationGain = gpxData.elevationGain || 0;
+      const averageSpeed = gpxData.averageSpeed || 0;
+
+      const xpFromDistance = Math.round(distance * 0.05);
+      const xpFromElevation = Math.round(elevationGain * 0.01);
+      const xpFromSpeed = Math.round(averageSpeed * 0.1); 
+
       // Check if user has organized rides on the same date FIRST
       const activityDate = new Date(gpxData.startTime as Date);
       console.log('Activity date:', activityDate); // Log activity date
@@ -888,6 +897,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (autoMatch) {
           // Auto-match successful - process as organizer GPX
+          console.log('Auto-match successful, creating organizer GPX record.');
+
+          // Calculate organizing bonus XP - ADDED
+          const organizingBonusXp = 50; // Example bonus XP for organizing
+
+           // Calculate total earned XP for organizer GPX - ADDED
+          const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed + organizingBonusXp;
+          const roundedEarnedXp = Math.round(earnedXp); // Round the total earned XP
+
           const organizerGpx = await storage.createOrganizerGpx({
             rideId: autoMatch.rideId,
             organizerId: userId,
@@ -903,11 +921,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             averageHeartRate: gpxData.averageHeartRate,
             maxHeartRate: gpxData.maxHeartRate,
             calories: gpxData.calories,
+            xpEarned: roundedEarnedXp,
+            xpDistance: xpFromDistance,
+            xpElevation: xpFromElevation,
+            xpSpeed: xpFromSpeed,
+            xpOrganizingBonus: organizingBonusXp,
           });
+          console.log(`Organizer GPX record created with ID: ${organizerGpx.id}`);
 
           // Mark ride as completed
-          await storage.completeRide(autoMatch.rideId, userId);
+          console.log(`Calling storage.completeRide for ride ${autoMatch.rideId} triggered by organizer GPX upload.`);
+          await storage.completeRide(autoMatch.rideId, userId); // Pass userId as organizer
           
+          // Increment the organizer's total XP - ADDED
+          if (roundedEarnedXp > 0) {
+            await storage.incrementUserXP(userId, roundedEarnedXp);
+            console.log(`Added ${roundedEarnedXp} XP to organizer ${userId} for organizer GPX upload.`);
+         }
           // Process participant proximity matching
           console.log('Before calling processParticipantMatching after auto-match'); // Add this log
           await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
@@ -1038,7 +1068,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } else {
           console.log(`No existing activity found for ride ${bestMatch.id}, creating new activity match`); // Log when creating new activity match
-          // Match found - complete the ride if not already completed
+          
+           // Calculate total earned XP for participant activity match 
+           const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
+           const roundedEarnedXp = Math.round(earnedXp);
+          
+          
+          // Match found - complete the ride if not already completed 
           if (!bestMatch.isCompleted) {
               console.log(`Ride ${bestMatch.id} is not completed, marking as completed`); // Log before completing ride
             await storage.completeRide(bestMatch.id, userId);
@@ -1062,11 +1098,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             maxHeartRate: gpxData.maxHeartRate ?? null, 
             calories: gpxData.calories ?? null,
             completedAt: new Date(),
+            xpEarned: roundedEarnedXp,
+            xpDistance: xpFromDistance,
+            xpElevation: xpFromElevation,
+            xpSpeed: xpFromSpeed,
+            xpOrganizingBonus: 0, // Participant matches don't get organizing bonus
           });
           console.log('After creating activity match record'); // Log after creating activity match
+          
+           // Immediately increment the user's total XP for this matched activity. - ADDED
+           if (roundedEarnedXp > 0) {
+            await storage.incrementUserXP(userId, roundedEarnedXp);
+            console.log(`Added ${roundedEarnedXp} XP to user ${userId} for activity match on ride ${bestMatch.id}.`);
+          }
+
+          // Note: storage.completeRide is NOT called here. Ride completion is an organizer action.
 
           res.json({
-            message: "Activity matched and ride completed!",
+            message: "Activity matched!",
             matchedRide: bestMatch,
             matchScore: bestMatchScore,
           });
@@ -1084,6 +1133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: "Error processing uploaded file for solo activity" });
          }
         
+         // Reuse the XP breakdown calculated earlier for solo activities
+        const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed; // Calculate total XP for solo activity
+        const roundedEarnedXp = Math.round(earnedXp);
+
         const soloActivity = await storage.createSoloActivity({
           name: `Manual Activity - ${new Date().toLocaleDateString()}`,
           description: `Solo cycling activity uploaded manually`,
@@ -1101,9 +1154,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           deviceType: deviceType || 'manual',
           completedAt: new Date(),
           userId,
+          xpEarned: roundedEarnedXp,
+          xpDistance: xpFromDistance,
+          xpElevation: xpFromElevation,
+          xpSpeed: xpFromSpeed,
+          // No organizing bonus for solo activities
+          xpOrganizingBonus: 0, // Ensure this is included and 0
         });
           console.log('Solo activity created:', soloActivity); // Log created solo activity
-
+        
+          // Increment user's total XP for the solo activity - ADDED
+        if (roundedEarnedXp > 0) {
+          await storage.incrementUserXP(userId, roundedEarnedXp);
+          console.log(`Solo activity created, XP increment handled within createSoloActivity.`); // Temporary log
+        }
 
         res.json({
           message: "Solo activity created successfully", 

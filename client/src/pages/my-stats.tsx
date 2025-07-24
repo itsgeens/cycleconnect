@@ -180,67 +180,78 @@ export default function MyStats() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
-          {statsLoading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <Skeleton className="h-4 w-24" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-8 w-16 mb-2" />
-                  <Skeleton className="h-3 w-20" />
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-yellow-500" /> {/* Using Trophy icon */}
-                    Total XP
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {stats?.xp !== undefined ? ( // Check if totalXp exists in the fetched stats
-                    <>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {stats.xp.toFixed(2)} {/* Correctly using stats.xp */}
-                      </div>
-                      <p className="text-sm text-gray-500">
-                       Level {currentLevel}: {getLevelName(currentLevel)} {/* Display Level number and name */}
-                      </p>
-                      </>
-                     ) : (
-                      <div className="text-2xl font-bold text-gray-900">N/A</div> // Display N/A if XP is not available
-                    )}
-                </CardContent>
-                {stats?.xp !== undefined && ( // Only show if stats and totalXp are available
-                  <div className="px-6 pb-4"> {/* Add padding to align with CardContent */}
-                   {currentLevel < 9 ? ( // Show progress bar if not Elite level
-                      <>
-                        <p className="text-xs text-gray-500 mb-1">Progress to Level {currentLevel + 1}</p>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                         <div
-                           className="bg-yellow-500 h-2 rounded-full"
-                            style={{ width: `${levelProgressPercentage}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-right text-xs text-gray-600 mt-1">
-                            {/* Use the correct variables for progress display */}
-                            {safeXpIntoCurrentLevel.toFixed(0)} / {(totalXpForCurrentLevelRange).toFixed(0)} XP
-                          </p>
-                        </>
-                     ) : (
-                      <div className="text-center text-sm font-medium text-gray-600"> {/* Message for Elite level */}
-                        Maximum Level Reached!
-                      </div>
-                    )}
+      {/* Stats Cards */}
+      {/* Modified grid layout: first card spans all columns */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 mb-8">
+        {statsLoading ? (
+          // Keep skeleton loaders, but adjust for the new layout if necessary
+          <>
+            <Card className="lg:col-span-3"> {/* Skeleton for the large XP card */}
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-32 mb-2" />
+                <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-24 mb-4" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-1/2 mt-2" />
+            </CardContent>
+         </Card>
+        {Array.from({ length: 5 }).map((_, i) => ( // Skeletons for the remaining smaller cards
+          <Card key={i}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-16 mb-2" />
+            <Skeleton className="h-3 w-20" />
+          </CardContent>
+        </Card>
+      ))}
+    </>
+  ) : (
+    <>
+             {/* Full-width XP Card */}
+            <Card className="lg:col-span-3"> {/* This card spans all 3 columns on large screens */}
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3"> {/* Adjusted title size and style */}
+                  <Trophy className="h-6 w-6 text-yellow-500" /> {/* Increased icon size */}
+                  Total XP
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between"> {/* Use flexbox for layout */}
+              <div className="mb-4 md:mb-0"> {/* Spacing for smaller screens */}
+                {stats?.xp !== undefined ? (
+                  <>
+                {/* Prominent XP Amount */}
+                <div className="text-4xl font-bold text-gray-900 mb-1">{stats.xp.toFixed(2)}</div> {/* Increased XP font size */}
+                {/* Level Information */}
+                <p className="text-lg text-gray-600">
+                 Level {currentLevel}: {getLevelName(currentLevel)} {/* Adjusted level font size */}
+                </p>
+              </>
+            ) : (
+              <div className="text-4xl font-bold text-gray-900">N/A</div> // Display N/A if XP is not available
+            )}
+          </div>
+
+          {stats?.xp !== undefined && currentLevel < 9 && ( // Show progress bar only if XP is available and not Elite
+             <div className="w-full md:w-1/2 lg:w-1/3"> {/* Progress bar takes available width */}
+               <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
+               <div className="w-full bg-gray-200 rounded-full h-3"> {/* Adjusted height */}
+                 <div
+                   className="bg-yellow-500 h-3 rounded-full" {/* Adjusted height */}
+                    style={{ width: `${levelProgressPercentage}%` }}
+                    ></div>
                   </div>
-                )}
-              </Card>
+                  <p className="text-right text-sm text-gray-700 mt-1"> {/* Adjusted text size and color */}
+                    {/* Use the correct variables for progress display */}
+                    {safeXpIntoCurrentLevel.toFixed(0)} / {(totalXpForCurrentLevelRange).toFixed(0)} XP
+                  </p>
+                </div>
+             )}
+        </CardContent>
+      </Card>
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">

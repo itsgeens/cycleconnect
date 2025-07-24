@@ -35,6 +35,7 @@ export const rideParticipants = pgTable("ride_participants", {
   rideId: integer("ride_id").references(() => rides.id).notNull(),
   userId: integer("user_id").references(() => users.id).notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  xpJoiningBonus: integer("xp_joining_bonus").default(0),
 });
 
 export const follows = pgTable("follows", {
@@ -64,6 +65,9 @@ export const soloActivities = pgTable("solo_activities", {
   completedAt: timestamp("completed_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   xpEarned: integer("xp_earned").default(0).notNull(), // Added XP column
+  xpDistance: integer("xp_distance").default(0), // Added XP from distance
+  xpElevation: integer("xp_elevation").default(0), // Added XP from elevation
+  xpSpeed: integer("xp_speed").default(0), // Added XP from speed
 });
 
 // Table for organizer GPX files linked to planned rides
@@ -86,6 +90,10 @@ export const organizerGpxFiles = pgTable("organizer_gpx_files", {
   linkedAt: timestamp("linked_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   xpEarned: integer("xp_earned").default(0),
+  xpDistance: integer("xp_distance").default(0), // Added XP from distance
+  xpElevation: integer("xp_elevation").default(0), // Added XP from elevation
+  xpSpeed: integer("xp_speed").default(0), // Added XP from speed
+  xpOrganizingBonus: integer("xp_organizing_bonus").default(0), // Added organizing bonus XP
 });
 
 // Table for participant proximity matches to organizer's actual ride
@@ -315,7 +323,14 @@ export const activityMatches = pgTable("activity_matches", {
   completedAt: timestamp("completed_at").notNull(),
   matchedAt: timestamp("matched_at").defaultNow().notNull(),
   xpEarned: integer("xp_earned").default(0),
-});
+  xpDistance: integer("xp_distance").default(0), // Added XP from distance
+  xpElevation: integer("xp_elevation").default(0), // Added XP from elevation
+  xpSpeed: integer("xp_speed").default(0), // Added XP from speed
+  xpOrganizingBonus: integer("xp_organizing_bonus").default(0), // Added organizing bonus XP")
+}, (table) => ({
+  uniqueUserRide: unique().on(table.rideId, table.userId),
+  uniqueUserDevice: unique().on(table.userId, table.deviceId),
+}));
 
 // Zod schemas for device connections
 export const insertDeviceConnectionSchema = createInsertSchema(deviceConnections).omit({

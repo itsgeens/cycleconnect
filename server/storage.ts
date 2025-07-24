@@ -89,8 +89,9 @@ export interface IStorage {
     soloActivities: SoloActivity[];
     
   }>;
-  // ADDED: Function to increment user XP
+  // ADDED: Function to increment and decrement user XP
   incrementUserXP(userId: number, amount: number): Promise<void>;
+  decrementUserXP(userId: number, amount: number): Promise<void>;
   // END ADDED
 
   // Organizer GPX operations
@@ -341,11 +342,18 @@ export class DatabaseStorage implements IStorage {
       if (organizerGpxToDelete) {
         console.log(`Organizer GPX found. Converting to solo activity.`);
         try {
+          // Decrement organizer's XP earned from this GPX before converting - ADDED
+          const organizerXpEarned = organizerGpxToDelete.xpEarned || 0;
+          if (organizerXpEarned > 0) {
+              await this.decrementUserXP(organizerGpxToDelete.organizerId, organizerXpEarned);
+              console.log(`Decremented organizer ${organizerGpxToDelete.organizerId} XP by ${organizerXpEarned} for deleted organizer GPX ${organizerGpxToDelete.id}.`);
+          }
+
           const soloActivityData = {
             userId: organizerGpxToDelete.organizerId,
-            name: `Former Group Ride: ${rideToDelete.name} (Organizer)`, // Differentiate organizer's solo activity
+            name: `Former Group Ride: ${rideToDelete.name} (Organizer)`,
             description: `Activity from deleted group ride: ${rideToDelete.name} (Organizer's route)`,
-            activityType: 'cycling', // Assuming cycling
+            activityType: 'cycling',
             gpxFilePath: organizerGpxToDelete.gpxFilePath,
             distance: organizerGpxToDelete.distance,
             duration: organizerGpxToDelete.duration,
@@ -356,8 +364,14 @@ export class DatabaseStorage implements IStorage {
             maxHeartRate: organizerGpxToDelete.maxHeartRate,
             calories: organizerGpxToDelete.calories,
             completedAt: organizerGpxToDelete.linkedAt || rideToDelete.completedAt || new Date(),
-            deviceName: organizerGpxToDelete.deviceName || 'Converted from Group Ride', // Use original device name if available
-            deviceType: organizerGpxToDelete.deviceType || 'manual', // Use original device type if available
+            deviceName: organizerGpxToDelete.deviceName || 'Converted from Group Ride',
+            deviceType: organizerGpxToDelete.deviceType || 'manual',
+            // Set XP earned to 0 for the converted solo activity to avoid double decrement - ADDED
+            xpEarned: 0,
+            xpDistance: 0,
+            xpElevation: 0,
+            xpSpeed: 0,
+            xpOrganizingBonus: 0, // Ensure this is 0 for solo activity
           };
 
           console.log(`Creating solo activity from organizer GPX: ${JSON.stringify(soloActivityData)}`);
@@ -377,7 +391,7 @@ export class DatabaseStorage implements IStorage {
          console.log(`No organizer GPX found. Found planned route GPX: ${rideToDelete.gpxFilePath}. Attempting to delete from Supabase.`);
          try {
            const { data, error } = await supabase.storage
-             .from('gpx-uploads') // Replace with your Supabase bucket name
+             .from('gpx-uploads')
              .remove([rideToDelete.gpxFilePath]);
 
            if (error) {
@@ -401,24 +415,37 @@ export class DatabaseStorage implements IStorage {
       for (const activityMatch of participantActivityMatches) {
         console.log(`Converting activity_match ${activityMatch.id} for user ${activityMatch.userId} to solo activity.`); // ADDED LOGGING
         try {
-          const soloActivityData = {
-            userId: activityMatch.userId,
-            name: `Former Group Ride: ${rideToDelete.name}`, // You can customize the name
-            description: `Activity from deleted group ride: ${rideToDelete.name}`,
-            activityType: 'cycling', // Assuming cycling
-            gpxFilePath: activityMatch.gpxFilePath, // Use the activity match's GPX path
-            distance: activityMatch.distance,
-            duration: activityMatch.duration,
-            movingTime: activityMatch.movingTime,
-            elevationGain: activityMatch.elevationGain,
-            averageSpeed: activityMatch.averageSpeed,
-            averageHeartRate: activityMatch.averageHeartRate,
-            maxHeartRate: activityMatch.maxHeartRate,
-            calories: activityMatch.calories,
-            completedAt: activityMatch.completedAt || rideToDelete.completedAt || new Date(),
-            deviceName: activityMatch.deviceName || 'Converted from Group Ride',
-            deviceType: activityMatch.deviceType || 'manual',
-          };
+          // Decrement participant's XP earned from this activity match before converting - ADDED
+          const participantXpEarned = activityMatch.xpEarned || 0;
+          if (participantXpEarned > 0) {
+              await this.decrementUserXP(activityMatch.userId, participantXpEarned);
+              console.log(`Decremented participant ${activityMatch.userId} XP by ${participantXpEarned} for deleted activity match ${activityMatch.id}.`);
+          }
+
+         const soloActivityData = {
+           userId: activityMatch.userId,
+           name: `Former Group Ride: ${rideToDelete.name}`,
+           description: `Activity from deleted group ride: ${rideToDelete.name}`,
+           activityType: 'cycling',
+           gpxFilePath: activityMatch.gpxFilePath,
+           distance: activityMatch.distance,
+           duration: activityMatch.duration,
+           movingTime: activityMatch.movingTime,
+           elevationGain: activityMatch.elevationGain,
+           averageSpeed: activityMatch.averageSpeed,
+           averageHeartRate: activityMatch.averageHeartRate,
+           maxHeartRate: activityMatch.maxHeartRate,
+           calories: activityMatch.calories,
+           completedAt: activityMatch.completedAt || rideToDelete.completedAt || new Date(),
+           deviceName: activityMatch.deviceName || 'Converted from Group Ride',
+           deviceType: activityMatch.deviceType || 'manual',
+           // Set XP earned to 0 for the converted solo activity to avoid double decrement - ADDED
+           xpEarned: 0,
+           xpDistance: 0,
+           xpElevation: 0,
+           xpSpeed: 0,
+           xpOrganizingBonus: 0, // Ensure this is 0 for solo activity
+         }; 
 
           console.log(`Creating solo activity from activity match: ${JSON.stringify(soloActivityData)}`); // ADDED LOGGING
           await tx.insert(soloActivities).values(soloActivityData);
@@ -438,15 +465,28 @@ export class DatabaseStorage implements IStorage {
           // Decide how to handle this error
         }
       }
+      // 4. Decrement participant joining bonus XP - ADDED
+      console.log(`Checking for participant joining bonus XP to decrement for ride: ${rideId}`);
+      const rideParticipantsToDelete = await tx.select().from(rideParticipants).where(eq(rideParticipants.rideId, rideId));
+      console.log(`Found ${rideParticipantsToDelete.length} participants to check for joining bonus.`);
+
+      for (const participant of rideParticipantsToDelete) {
+         const joiningBonus = participant.xpJoiningBonus || 0;
+         if (joiningBonus > 0) {
+             await this.decrementUserXP(participant.userId, joiningBonus);
+             console.log(`Decremented participant ${participant.userId} XP by joining bonus ${joiningBonus} for deleted ride ${rideId}.`);
+         }
+      }
+      // Note: The rideParticipants records themselves are deleted in the next step by the cascade.
 
 
-      // 4. Delete all participants associated with the ride
+      // 5. Delete all participants associated with the ride
       console.log(`Deleting participants for ride: ${rideId}`);
       await tx.delete(rideParticipants).where(eq(rideParticipants.rideId, rideId));
       console.log(`Participants deleted for ride: ${rideId}`);
 
 
-      // 5. Then delete the ride record from the database
+      // 6. Then delete the ride record from the database
       console.log(`Deleting ride record from database: ${rideId}`);
       await tx.delete(rides).where(eq(rides.id, rideId));
       console.log(`Ride record deleted from database: ${rideId}`);
@@ -549,6 +589,8 @@ export class DatabaseStorage implements IStorage {
          console.warn(`[completeRide] Ride ${rideId} not found.`);
          throw new Error("Ride not found.");
     }
+    
+    // Keep the organizer check here as only organizer can manually complete the ride
     if (ride.organizerId !== userId) {
         console.warn(`[completeRide] User ${userId} is not the organizer of ride ${rideId}. Organizer is ${ride.organizerId}.`);
         throw new Error("Only the organizer can complete a ride");
@@ -556,7 +598,7 @@ export class DatabaseStorage implements IStorage {
     console.log(`[completeRide] User ${userId} verified as organizer for ride ${rideId}. Proceeding.`);
 
 
-    // --- XP Calculation and Distribution ---
+    // --- Process Participant Matching and Activity XP ---
 
     console.log(`[completeRide] Starting XP calculation and distribution for ride ${rideId}.`);
 
@@ -572,93 +614,106 @@ export class DatabaseStorage implements IStorage {
     for (const activity of participantActivities) {
         console.log(`[completeRide] Processing activity match ${activity.id} for participant ${activity.userId}.`);
         // Calculate XP based on participant's activity data
-        // Ensure distance, elevationGain, averageSpeed are treated as numbers
         const distance = typeof activity.distance === 'string' ? parseFloat(activity.distance) : activity.distance || 0;
         const elevationGain = typeof activity.elevationGain === 'string' ? parseFloat(activity.elevationGain) : activity.elevationGain || 0;
         const averageSpeed = typeof activity.averageSpeed === 'string' ? parseFloat(activity.averageSpeed) : activity.averageSpeed || 0;
 
+        // Calculate XP contribution from each metric (rounded) - ADDED
+        const xpFromDistance = Math.round(distance * 0.05);
+        const xpFromElevation = Math.round(elevationGain * 0.01);
+        const xpFromSpeed = Math.round(averageSpeed * 0.1);
 
-        // Calculate XP: distance + elevation + speed (using the revised multiplier)
-        // Use Math.max to ensure XP is not negative in case of weird data
-        const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1));
-        const roundedEarnedXp = Math.round(earnedXp);
+        // Calculate total earned XP by summing the rounded breakdown values - MODIFIED
+        const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
+        const roundedEarnedXp = earnedXp; // Use earnedXp directly as it's already summed from rounded values
+
 
         if (roundedEarnedXp > 0) {
-             console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}).`);
+          console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}). Breakdown: D=${xpFromDistance}, E=${xpFromElevation}, S=${xpFromSpeed}`); 
              
+            // Update the activity match record with the calculated XP breakdown and total.
              await db.update(activityMatches)
-                     .set({ xpEarned: roundedEarnedXp })
+                     .set({ 
+                        xpEarned: roundedEarnedXp,
+                        xpDistance: xpFromDistance, // ADDED
+                        xpElevation: xpFromElevation, // ADDED
+                        xpSpeed: xpFromSpeed, // ADDED
+                        xpOrganizingBonus: 0, // Added to ensure consistency
+                      })
                      .where(eq(activityMatches.id, activity.id));
-                 console.log(`[completeRide] Saved ${roundedEarnedXp} XP to activityMatches record ${activity.id}.`);
+                     console.log(`[completeRide] Saved ${roundedEarnedXp} XP and breakdown to activityMatches record ${activity.id}.`); // MODIFIED log message
              
+             // Increment the user's total XP *only if* XP was just awarded (optional check)
+             // Let's rely on incrementUserXP handling 0 for simplicity.
              await this.incrementUserXP(activity.userId, roundedEarnedXp);
              console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to user ${activity.userId}.`);
+        }
+    }
+    console.log(`[completeRide] Finished participant matching and activity XP processing for ride ${rideId}.`);
+    // --- End Participant XP Processing ---
 
+    
+    console.log(`[completeRide] Processing participant joining bonus XP for ride ${rideId}.`);
+
+    // Fetch all participants for this ride
+    const participants = await db
+        .select()
+        .from(rideParticipants)
+        .where(eq(rideParticipants.rideId, rideId));
+
+    console.log(`[completeRide] Found ${participants.length} participants for joining bonus calculation.`);
+
+    // Calculate and award joining bonus for each participant
+    const joiningBonusPerParticipant = 1; // Example fixed joining bonus per participant
+
+    for (const participant of participants) {
+        console.log(`[completeRide] Processing joining bonus for participant ${participant.userId}.`);
+
+        // Check if joining bonus has already been awarded for this participant and ride
+        // This prevents awarding the bonus multiple times if completeRide is called again
+        if (participant.xpJoiningBonus === 0) { // Assuming default value is 0 and only updated when awarded
+             console.log(`[completeRide] Awarding joining bonus to participant ${participant.userId}.`);
+
+             // Update the rideParticipants record with the joining bonus
+             await db.update(rideParticipants)
+                     .set({ xpJoiningBonus: joiningBonusPerParticipant })
+                     .where(eq(rideParticipants.id, participant.id));
+                 console.log(`[completeRide] Saved ${joiningBonusPerParticipant} Joining Bonus XP to rideParticipants record ${participant.id}.`);
+
+             // Increment the user's total XP with the joining bonus
+             if (joiningBonusPerParticipant > 0) { // Only increment if joining bonus is positive
+                await this.incrementUserXP(participant.userId, joiningBonusPerParticipant);
+                console.log(`[completeRide] Added ${joiningBonusPerParticipant} Joining Bonus XP to user ${participant.userId}.`);
+             }
         } else {
-            console.log(`[completeRide] Calculated 0 XP for participant ${activity.userId} (Activity ${activity.id}). Skipping XP increment.`);
+            console.log(`[completeRide] Joining bonus already awarded to participant ${participant.userId}. Skipping.`);
         }
     }
 
-    // 3. Calculate and add XP for the organizer if they uploaded a GPX
-    const [organizerGpx] = await db
-        .select()
-        .from(organizerGpxFiles)
-        .where(eq(organizerGpxFiles.rideId, rideId));
+    console.log(`[completeRide] Finished participant joining bonus XP processing.`);
+    // --- End Participant Joining Bonus XP Processing ---
 
-    console.log(`[completeRide] Organizer GPX found for ride ${rideId}: ${!!organizerGpx}`);
-
-    if (organizerGpx) {
-        // Calculate XP based on organizer's GPX data and a bonus for organizing
-         const distance = typeof organizerGpx.distance === 'string' ? parseFloat(organizerGpx.distance) : organizerGpx.distance || 0;
-        const elevationGain = typeof organizerGpx.elevationGain === 'string' ? parseFloat(organizerGpx.elevationGain) : organizerGpx.elevationGain || 0;
-
-        const organizingBonusXp = 50; // Example bonus XP for organizing
-
-        const earnedXp = Math.max(0, (distance * 0.05) + (elevationGain * 0.01) + organizingBonusXp);
-        const roundedEarnedXp = Math.round(earnedXp); // Add this line
-
-         if (roundedEarnedXp > 0) {
-            console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}).`);
-            
-            await db.update(organizerGpxFiles)
-                    .set({ xpEarned: roundedEarnedXp })
-                    .where(eq(organizerGpxFiles.id, organizerGpx.id));
-                console.log(`[completeRide] Saved ${roundedEarnedXp} XP to organizerGpxFiles record ${organizerGpx.id}.`);
-            
-            await this.incrementUserXP(userId, roundedEarnedXp); // userId is the organizerId
-            console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to organizer ${userId}.`);
-
-         
-          } else {
-             console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (Organizer GPX ${organizerGpx.id}). Skipping XP increment.`);
-         }
-    } else {
-         // If the organizer didn't upload a GPX but completed the ride,
-         // they still get a small amount of XP for organizing.
-         const organizingBonusXp = 20; // Smaller bonus if no GPX
-
-         if (organizingBonusXp > 0) {
-            console.log(`[completeRide] Calculated ${organizingBonusXp.toFixed(2)} XP for organizer ${userId} (no GPX).`);
-            await this.incrementUserXP(userId, organizingBonusXp);
-             console.log(`[completeRide] Added ${organizingBonusXp.toFixed(2)} XP to organizer ${userId}.`);
-         } else {
-             console.log(`[completeRide] Calculated 0 XP for organizer ${userId} (no GPX). Skipping XP increment.`);
-         }
-    }
-
-    console.log(`[completeRide] Finished XP calculation and distribution for ride ${rideId}.`);
-    // --- End XP Calculation ---
+    // --- Organizer XP Calculation Removed ---
+    // The XP calculation for the organizer's GPX or the organizing bonus
+    // is removed from here. It will happen in the /api/upload-activity
+    // or /api/link-organizer-gpx routes when the organizer's GPX is processed.
+    console.log(`[completeRide] Organizer XP calculation skipped in completeRide. Handled during organizer GPX upload/linking.`);
 
     // Mark the ride as completed
-    console.log(`[completeRide] Marking ride ${rideId} as completed.`);
-    await db
-      .update(rides)
-      .set({
-        isCompleted: true,
-        completedAt: new Date()
-      })
-      .where(eq(rides.id, rideId));
-    console.log(`[completeRide] Ride ${rideId} marked as completed.`);
+    // Add a check if it's already completed to avoid unnecessary updates
+    if (!ride.isCompleted) {
+      console.log(`[completeRide] Marking ride ${rideId} as completed.`);
+      await db
+        .update(rides)
+        .set({
+          isCompleted: true,
+          completedAt: new Date()
+        })
+        .where(eq(rides.id, rideId));
+      console.log(`[completeRide] Ride ${rideId} marked as completed.`);
+  } else {
+      console.log(`[completeRide] Ride ${rideId} was already completed. Skipping update.`);
+  }
 }
 
   async getUserStats(userId: number, timeframe: string): Promise<{
@@ -1253,6 +1308,9 @@ export class DatabaseStorage implements IStorage {
         const distance = insertData.distance ? parseFloat(insertData.distance.toString()) : 0;
         const elevationGain = insertData.elevationGain ? parseFloat(insertData.elevationGain.toString()) : 0;
         const averageSpeed = insertData.averageSpeed ? parseFloat(insertData.averageSpeed.toString()) : 0;
+        const xpFromDistance = Math.round(distance * 0.05);
+        const xpFromElevation = Math.round(elevationGain * 0.01);
+        const xpFromSpeed = Math.round(averageSpeed * 0.1);
     
         console.log(`[createSoloActivity] Calculating XP for activity: ${insertData.name}`);
         console.log(`[createSoloActivity] Distance: ${distance}`);
@@ -1260,7 +1318,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`[createSoloActivity] Average Speed: ${averageSpeed}`);
 
         // Calculate XP: distance + elevation + speed (using the revised multiplier)
-        const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
+        const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;;
     
         // Round the earned XP to the nearest integer
         const roundedEarnedXp = Math.round(earnedXp);
@@ -1273,6 +1331,9 @@ export class DatabaseStorage implements IStorage {
         const finalInsertData = {
             ...insertData,
             xpEarned: roundedEarnedXp, 
+            xpDistance: xpFromDistance, // XP from distance
+            xpElevation: xpFromElevation, // XP from elevation
+            xpSpeed: xpFromSpeed, // XP from speed
         };
     
 
@@ -1284,7 +1345,8 @@ export class DatabaseStorage implements IStorage {
     // Add XP to the user's total
     // Only increment if the earned XP is positive
     if (roundedEarnedXp > 0) {
-      await this.incrementUserXP(newActivity.userId, roundedEarnedXp);
+      // commented out because this is being handled in routes Solo Activity
+      // await this.incrementUserXP(newActivity.userId, roundedEarnedXp);
       console.log(`[createSoloActivity] Added ${roundedEarnedXp} XP to user ${newActivity.userId} for solo activity ${newActivity.id}.`);
     } else {
       console.log(`[createSoloActivity] Calculated 0 XP for solo activity ${newActivity.id}. Skipping user XP increment.`);
@@ -1309,7 +1371,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSoloActivity(id: number): Promise<void> {
+    // Get the activity to check ownership and get file path and XP earned - ADDED
+    const [activity] = await db.select().from(soloActivities).where(eq(soloActivities.id, id));
+
+    if (!activity) {
+        console.warn(`Solo activity with ID ${id} not found for deletion.`);
+        return; // Activity not found
+    }
+
+    // Store XP earned before deleting the activity - ADDED
+    const xpEarned = activity.xpEarned || 0;
+
+    // Delete the activity from database
     await db.delete(soloActivities).where(eq(soloActivities.id, id));
+    console.log(`Deleted solo activity record with ID: ${id}.`);
+
+    // Decrement user's XP if XP was earned from this activity - ADDED
+    if (xpEarned > 0) {
+      await this.decrementUserXP(activity.userId, xpEarned); // Use the decrement function
+      console.log(`Decremented user ${activity.userId} XP by ${xpEarned} for deleting solo activity ${id}.`);
+   } else {
+      console.log(`No XP earned from solo activity ${id}, skipping XP decrement.`);
+   }
   }
   // ADDED: Function to increment user XP
   async incrementUserXP(userId: number, amount: number): Promise<void> {
@@ -1366,7 +1449,29 @@ export class DatabaseStorage implements IStorage {
       completedRides.map(async (ride) => {
         // First check for participant activity data
         const [userActivityData] = await db
-          .select()
+          .select({
+            id: activityMatches.id,
+              rideId: activityMatches.rideId,
+              userId: activityMatches.userId,
+              deviceId: activityMatches.deviceId,
+              routeMatchPercentage: activityMatches.routeMatchPercentage,
+              gpxFilePath: activityMatches.gpxFilePath,
+              distance: activityMatches.distance,
+              duration: activityMatches.duration,
+              movingTime: activityMatches.movingTime,
+              elevationGain: activityMatches.elevationGain,
+              averageSpeed: activityMatches.averageSpeed,
+              averageHeartRate: activityMatches.averageHeartRate,
+              maxHeartRate: activityMatches.maxHeartRate,
+              calories: activityMatches.calories,
+              completedAt: activityMatches.completedAt,
+              matchedAt: activityMatches.matchedAt,
+              xpEarned: activityMatches.xpEarned,
+              xpDistance: activityMatches.xpDistance,
+              xpElevation: activityMatches.xpElevation,
+              xpSpeed: activityMatches.xpSpeed,
+              xpOrganizingBonus: activityMatches.xpOrganizingBonus,
+          })
           .from(activityMatches)
           .where(
             and(
@@ -1380,7 +1485,30 @@ export class DatabaseStorage implements IStorage {
         let finalUserActivityData = userActivityData;
         if (!userActivityData && ride.organizerId === userId) {
           const [organizerGpxData] = await db
-            .select()
+          .select({
+            id: organizerGpxFiles.id,
+            rideId: organizerGpxFiles.rideId,
+            organizerId: organizerGpxFiles.organizerId,
+            gpxFilePath: organizerGpxFiles.gpxFilePath,
+            originalGpxPath: organizerGpxFiles.originalGpxPath,
+            matchScore: organizerGpxFiles.matchScore,
+            isManuallyLinked: organizerGpxFiles.isManuallyLinked,
+            distance: organizerGpxFiles.distance,
+            duration: organizerGpxFiles.duration,
+            movingTime: organizerGpxFiles.movingTime,
+            elevationGain: organizerGpxFiles.elevationGain,
+            averageSpeed: organizerGpxFiles.averageSpeed,
+            averageHeartRate: organizerGpxFiles.averageHeartRate,
+            maxHeartRate: organizerGpxFiles.maxHeartRate,
+            calories: organizerGpxFiles.calories,
+            linkedAt: organizerGpxFiles.linkedAt,
+            createdAt: organizerGpxFiles.createdAt,
+            xpEarned: organizerGpxFiles.xpEarned,
+            xpDistance: organizerGpxFiles.xpDistance,
+            xpElevation: organizerGpxFiles.xpElevation,
+            xpSpeed: organizerGpxFiles.xpSpeed,
+            xpOrganizingBonus: organizerGpxFiles.xpOrganizingBonus,
+          })
             .from(organizerGpxFiles)
             .where(eq(organizerGpxFiles.rideId, ride.id))
             .limit(1);
@@ -1405,11 +1533,35 @@ export class DatabaseStorage implements IStorage {
               completedAt: organizerGpxData.linkedAt || ride.completedAt,
               matchedAt: organizerGpxData.linkedAt || ride.completedAt,
               xpEarned: organizerGpxData.xpEarned,
+              xpDistance: organizerGpxData.xpDistance,
+              xpElevation: organizerGpxData.xpElevation,
+              xpSpeed: organizerGpxData.xpSpeed,
+              xpOrganizingBonus: organizerGpxData.xpOrganizingBonus,
             };
           }
         }
 
+         // Fetch user's participation data for this ride - ADDED
+         const [userParticipationData] = await db
+         .select({
+            id: rideParticipants.id,
+            rideId: rideParticipants.rideId,
+            userId: rideParticipants.userId,
+            joinedAt: rideParticipants.joinedAt,
+            xpJoiningBonus: rideParticipants.xpJoiningBonus, // ADDED
+         })
+         .from(rideParticipants)
+         .where(
+           and(
+             eq(rideParticipants.rideId, ride.id),
+             eq(rideParticipants.userId, userId)
+           )
+         )
+         .limit(1);
+
+
         console.log(`User activity data for ride ${ride.id}:`, finalUserActivityData);
+        console.log(`User participation data for ride ${ride.id}:`, userParticipationData);
 
         const result = {
           // Include all properties from the base Ride type from the select query result
@@ -1430,8 +1582,8 @@ export class DatabaseStorage implements IStorage {
           // Add the additional properties expected in the interface
           organizerName: ride.organizerName || 'Unknown',
           participantCount: Number(ride.participantCount), // Ensure number type
-          // userActivityData is fetched but NOT included in the completedRides array itself as per the interface
-          xpEarned: finalUserActivityData?.xpEarned,
+          userActivityData: finalUserActivityData, // Include the fetched/converted activity data
+          userParticipationData: userParticipationData, // Include the fetched participation data - ADDED
         };
         console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
         
@@ -1613,6 +1765,21 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return organizerGpx;
+  }
+
+  async decrementUserXP(userId: number, amount: number): Promise<void> {
+    if (amount <= 0) {
+        console.warn(`Attempted to decrement XP by a non-positive amount for user ${userId}: ${amount}`);
+        return; // Do not process non-positive XP amounts
+    }
+    // Ensure XP does not go below zero
+    await db
+      .update(users)
+      .set({
+        xp: sql`${users.xp} - ${amount} > 0 ? ${users.xp} - ${amount} : 0`,
+      })
+      .where(eq(users.id, userId));
+    console.log(`Decremented user ${userId} XP by ${amount}.`);
   }
 }
 

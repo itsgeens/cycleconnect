@@ -248,18 +248,57 @@ export default function MyPerformance() {
                   )}
                 </div>
               </div>
-              {userActivityData.xpEarned !== undefined && ( // Check if xpEarned exists
-                 <div className="flex items-center gap-3">
-                    <Trophy className="w-5 h-5 text-yellow-500" /> {/* Using Trophy icon for XP */}
-                    <div>
-                       <p className="font-medium">XP Earned</p>
-                       <p className="text-lg font-bold text-yellow-600">
-                        {/* Ensure xpEarned is treated as a number and format it */}
-                        {parseFloat(userActivityData.xpEarned.toString()).toFixed(2)} XP
-                       </p>
+              {userActivityData?.xpEarned !== undefined && (
+                 <div>
+                    <div className="flex items-center gap-3">
+                       <Trophy className="w-5 h-5 text-yellow-500" /> {/* Using Trophy icon for XP */}
+                       <div>
+                          <p className="font-medium">Total Activity XP Earned</p>
+                          <p className="text-lg font-bold text-yellow-600">
+                           {/* Ensure xpEarned is treated as a number and format it */}
+                           {parseFloat(userActivityData.xpEarned.toString()).toFixed(2)} XP
+                          </p>
+                       </div>
+                     </div>
+
+                     {/* XP Breakdown (for activities with breakdown data) */}
+                     {(userActivityData.xpDistance !== undefined || userActivityData.xpElevation !== undefined || userActivityData.xpSpeed !== undefined) && (
+                         <div className="ml-8 mt-2 text-sm text-gray-600 space-y-1"> {/* Indent the breakdown */}
+                             <p>Breakdown:</p>
+                             {userActivityData.xpDistance !== undefined && (
+                                 <p>- Distance: {userActivityData.xpDistance} XP</p>
+                             )}
+                              {userActivityData.xpElevation !== undefined && (
+                                 <p>- Elevation: {userActivityData.xpElevation} XP</p>
+                             )}
+                             {userActivityData.xpSpeed !== undefined && (
+                                 <p>- Speed: {userActivityData.xpSpeed} XP</p>
+                             )}
+                         </div>
+                     )}
+
+                     {/* Organizing Bonus (only for organizer's GPX) */}
+                     {userActivityData.xpOrganizingBonus !== undefined && userActivityData.xpOrganizingBonus > 0 && (
+                          <div className="ml-8 mt-1 text-sm text-gray-600"> {/* Indent the bonus */}
+                              <p>- Organizing Bonus: {userActivityData.xpOrganizingBonus} XP</p>
+                          </div>
+                     )}
+                 </div>
+               )}
+
+               {/* Joining Bonus (only for participant's participation) */}
+               {userParticipationData?.xpJoiningBonus !== undefined && userParticipationData.xpJoiningBonus > 0 && (
+                    <div className="flex items-center gap-3 mt-4"> {/* Add spacing */}
+                       <Users className="w-5 h-5 text-blue-500" /> {/* Using Users icon for Joining Bonus */}
+                       <div>
+                          <p className="font-medium">Joining Bonus</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {userParticipationData.xpJoiningBonus} XP
+                          </p>
+                       </div>
                     </div>
-                  </div>
-          )}
+               )}
+
             </CardContent>
           </Card>
 
