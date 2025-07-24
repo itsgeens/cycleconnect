@@ -63,6 +63,7 @@ export const soloActivities = pgTable("solo_activities", {
   deviceType: text("device_type"), // cycling_computer, smartwatch, phone
   completedAt: timestamp("completed_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  xpEarned: integer("xp_earned").default(0).notNull(), // Added XP column
 });
 
 // Table for organizer GPX files linked to planned rides

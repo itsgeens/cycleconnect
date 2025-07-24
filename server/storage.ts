@@ -594,9 +594,6 @@ export class DatabaseStorage implements IStorage {
              await this.incrementUserXP(activity.userId, roundedEarnedXp);
              console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to user ${activity.userId}.`);
 
-             // Now increment the user's total XP based on the rounded amount saved to the activity match
-             await this.incrementUserXP(activity.userId, roundedEarnedXp);
-             console.log(`[completeRide] Added ${roundedEarnedXp} XP to user ${activity.userId}.`);
         } else {
             console.log(`[completeRide] Calculated 0 XP for participant ${activity.userId} (Activity ${activity.id}). Skipping XP increment.`);
         }
@@ -1251,26 +1248,39 @@ export class DatabaseStorage implements IStorage {
         completedAt: activity.completedAt instanceof Date ? activity.completedAt : new Date(activity.completedAt), // Ensure completedAt is a Date object
         // createdAt will use the defaultNow() from the schema
     };
+    
+        // Calculate XP for the solo activity BEFORE inserting
+        const distance = insertData.distance ? parseFloat(insertData.distance.toString()) : 0;
+        const elevationGain = insertData.elevationGain ? parseFloat(insertData.elevationGain.toString()) : 0;
+        const averageSpeed = insertData.averageSpeed ? parseFloat(insertData.averageSpeed.toString()) : 0;
+    
+        // Calculate XP: distance + elevation + speed (using the revised multiplier)
+        const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
+    
+        // Round the earned XP to the nearest integer
+        const roundedEarnedXp = Math.round(earnedXp);
+    
+        // Add the calculated XP to the insert data
+        // Assuming your soloActivities schema has an 'xp' column
+        const finalInsertData = {
+            ...insertData,
+            xp: roundedEarnedXp, 
+        };
+    
 
     const [newActivity] = await db
       .insert(soloActivities)
-      .values(insertData) // Use the manually constructed insertData
+      .values(finalInsertData) 
       .returning();
 
-    // Calculate XP for the solo activity
-    const distance = newActivity.distance ? parseFloat(newActivity.distance.toString()) : 0;
-    const elevationGain = newActivity.elevationGain ? parseFloat(newActivity.elevationGain.toString()) : 0;
-    const averageSpeed = newActivity.averageSpeed ? parseFloat(newActivity.averageSpeed.toString()) : 0;
-
-    // Calculate XP: distance + elevation + speed (using the revised multiplier)
-    const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
-
-    // Round the earned XP to the nearest integer
-    const roundedEarnedXp = Math.round(earnedXp); // Add this line
-
-    // Add XP to the user
-    await this.incrementUserXP(newActivity.userId, roundedEarnedXp);
-
+    // Add XP to the user's total
+    // Only increment if the earned XP is positive
+    if (roundedEarnedXp > 0) {
+      await this.incrementUserXP(newActivity.userId, roundedEarnedXp);
+      console.log(`[createSoloActivity] Added ${roundedEarnedXp} XP to user ${newActivity.userId} for solo activity ${newActivity.id}.`);
+    } else {
+      console.log(`[createSoloActivity] Calculated 0 XP for solo activity ${newActivity.id}. Skipping user XP increment.`);
+    }
     return newActivity;
   }
 
