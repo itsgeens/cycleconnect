@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { authManager } from "@/lib/auth";
+import DonutChart from "@/components/donut-chart";
 import { 
   Calendar, 
   TrendingUp, 
@@ -207,52 +208,6 @@ export default function MyStats() {
             </Select>
           </div>
         </div>
-
-        {/* Full-width XP Card */}
-        <Card className="w-full mb-8"> {/* Ensure it's full width */}
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                  <Trophy className="h-6 w-6 text-yellow-500" />
-                  Total XP
-              </CardTitle>
-            </CardHeader>
-
-
-
-            <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between">
-              <div className="mb-4 md:mb-0">
-                {statsLoading ? ( // Add loading state for XP
-                    <Skeleton className="h-10 w-32 mb-1" />
-                ) : stats?.xp !== undefined ? (
-                  <>
-                    <div className="text-4xl font-bold text-gray-900 mb-1">{stats.xp.toFixed(2)}</div>
-                    <p className="text-lg text-gray-600">
-                      Level {currentLevel}: {getLevelName(currentLevel)}
-                    </p>
-                  </>
-                ) : (
-                  <div className="text-4xl font-bold text-gray-900">N/A</div>
-                )}
-              </div>
-
-              {statsLoading ? ( // Add loading state for progress bar
-                 <Skeleton className="h-10 w-full md:w-1/2 lg:w-1/3" />
-              ) : stats?.xp !== undefined && currentLevel < 9 && (
-                 <div className="w-full md:w-1/2 lg:w-1/3">
-                   <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p>
-                   <div className="w-full bg-gray-200 rounded-full h-3">
-                     <div
-                       className="bg-yellow-500 h-3 rounded-full"
-                        style={{ width: `${levelProgressPercentage}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-right text-sm text-gray-700 mt-1">
-                        {safeXpIntoCurrentLevel.toFixed(0)} / {(totalXpForCurrentLevelRange).toFixed(0)} XP
-                      </p>
-                    </div>
-                 )}
-            </CardContent>
-          </Card>
          ) : (
              {/* Full-width XP Card */}
             <Card className="lg:col-span-3"> {/* This card spans all 3 columns on large screens */}
@@ -313,30 +268,17 @@ export default function MyStats() {
                         <Skeleton className="h-40 w-40 rounded-full" />
                     ) : (
                        <>
-                         {/* Placeholder for your DonutChart component */}
-                         {/* <DonutChart
-                             data={[
-                                 { name: 'Solo Activities', value: completedSoloRidesCount },
-                                 { name: 'Organized Rides', value: completedOrganizedRidesCount },
-                                 { name: 'Joined Rides', value: completedJoinedRidesCount },
-                             ]}
-                             innerRadius={60} // Adjust as needed
-                             outerRadius={80} // Adjust as needed
-                             fill="#8884d8" // Adjust as needed
-                             paddingAngle={2} // Adjust as needed
-                             dataKey="value"
-                         /> */}
+                        <DonutChart
+                               data={[
+                                   { name: 'Solo Activities', value: completedSoloRidesCount },
+                                   { name: 'Organized Rides', value: completedOrganizedRidesCount },
+                                   { name: 'Joined Rides', value: completedJoinedRidesCount },
+                               ]}
+                           />
                          {/* Simple text representation if chart not available */}
                          <div className="text-center">
                              <div className="text-5xl font-bold text-gray-900 mb-2">{totalCompletedRides}</div> {/* Total in center */}
                              <p className="text-sm text-gray-600">Total Completed Rides</p>
-                             {/* Basic breakdown list */}
-                             <div className="mt-4 text-left text-sm text-gray-700 space-y-1">
-                                 <p>Breakdown:</p>
-                                 <p>- Solo: {completedSoloRidesCount}</p>
-                                 <p>- Organized: {completedOrganizedRidesCount}</p>
-                                 <p>- Joined: {completedJoinedRidesCount}</p>
-                             </div>
                          </div>
                        </>
                     )}
