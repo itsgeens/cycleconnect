@@ -207,6 +207,7 @@ export default function MyStats() {
                   {stats?.xp !== undefined ? ( // Check if totalXp exists in the fetched stats
                     <>
                       <div className="text-2xl font-bold text-gray-900">{stats.totalXp.toFixed(2)}</div> {/* Format to 2 decimal places */}
+                        {stats.xp !== undefined ? stats.xp.toFixed(2) : 'N/A'}
                       <p className="text-sm text-gray-500">
                        Level {currentLevel}: {getLevelName(currentLevel)} {/* Display Level number and name */}
                       </p>

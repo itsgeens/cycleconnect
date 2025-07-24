@@ -1272,7 +1272,7 @@ export class DatabaseStorage implements IStorage {
         // Assuming your soloActivities schema has an 'xp' column
         const finalInsertData = {
             ...insertData,
-            xp: roundedEarnedXp, 
+            xpEarned: roundedEarnedXp, 
         };
     
 
