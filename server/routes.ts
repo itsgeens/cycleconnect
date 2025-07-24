@@ -2,7 +2,7 @@ import type { Express, Request } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertRideSchema, rideFiltersSchema, insertSoloActivitySchema, insertOrganizerGpxFileSchema, linkGpxSchema } from "@shared/schema";
+import { rideParticipants, insertUserSchema, loginSchema, insertRideSchema, rideFiltersSchema, insertSoloActivitySchema, insertOrganizerGpxFileSchema, linkGpxSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import bcrypt from "bcrypt";
 import multer from "multer";
@@ -13,6 +13,8 @@ import { parseGPXFile, calculateRouteMatch } from "./gpx-parser";
 import { WeatherService } from "./weather";
 import { GPXProximityMatcher } from "./gpx-proximity-matcher";
 import fetch from 'node-fetch'; // Import fetch if not already imported
+import { db } from "./db";
+import { eq, and, sql, desc, asc } from "drizzle-orm";
 
 // Extend Request type to include userId
 declare global {
@@ -448,6 +450,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get user's activity data for this ride
           const userActivityData = await storage.getUserActivityForRide(rideId, userId);
           
+           // **Fetch user's participation data for this ride - ADDED**
+           const [userParticipationData] = await db
+           .select({ // Select the specific fields needed for userParticipationData
+               id: rideParticipants.id,
+               rideId: rideParticipants.rideId,
+               userId: rideParticipants.userId,
+               joinedAt: rideParticipants.joinedAt,
+               xpJoiningBonus: rideParticipants.xpJoiningBonus,
+           })
+           .from(rideParticipants)
+           .where(and(eq(rideParticipants.rideId, rideId), eq(rideParticipants.userId, userId)))
+           .limit(1);
+
           // Get organizer's actual GPX file if available
           const organizerGpx = await storage.getOrganizerGpx(rideId);
           

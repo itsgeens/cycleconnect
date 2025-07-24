@@ -1776,9 +1776,10 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(users)
       .set({
-        xp: sql`${users.xp} - ${amount} > 0 ? ${users.xp} - ${amount} : 0`,
+        xp: sql`CASE WHEN ${users.xp} - ${amount} > 0 THEN ${users.xp} - ${amount} ELSE 0 END`,
       })
       .where(eq(users.id, userId));
+      
     console.log(`Decremented user ${userId} XP by ${amount}.`);
   }
 }
