@@ -13,14 +13,14 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) =>
   // const chartData = data.filter(item => item.value > 0);
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={200}> {/* Reduced height */}
       <PieChart>
         <Pie
           data={data}
           cx="50%"
           cy="50%"
-          innerRadius={80} // Adjust as needed
-          outerRadius={100} // Adjust as needed
+          innerRadius={60} // Reduced radius
+          outerRadius={80} // Reduced radius
           fill="#8884d8"
           paddingAngle={2} // Adjust as needed
           dataKey="value"

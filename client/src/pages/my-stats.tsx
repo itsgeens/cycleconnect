@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { authManager } from "@/lib/auth";
 import DonutChart from "@/components/donut-chart";
-import { 
-  Calendar, 
-  TrendingUp, 
-  Mountain, 
-  Route, 
+import {
+  Calendar,
+  TrendingUp,
+  Mountain,
+  Route,
   Trophy,
   Activity,
   Users,
@@ -86,7 +86,7 @@ export default function MyStats() {
   const [, navigate] = useLocation();
   const { userId } = useParams<{ userId: string }>();
   const currentUser = authManager.getState().user;
-  
+
   // Determine if viewing own stats or another user's stats
   const isOwnStats = !userId;
   const targetUserId = isOwnStats ? currentUser?.id : parseInt(userId!);
@@ -102,7 +102,9 @@ export default function MyStats() {
         },
       });
       if (!response.ok) throw new Error("Failed to fetch stats");
-      return response.json();
+      const statsData = await response.json(); // Keep this line to access the data
+      console.log("Fetched stats data:", statsData); // Keep this log
+      return statsData; // Return the actual data here
     },
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache the data (updated property name)
@@ -110,8 +112,8 @@ export default function MyStats() {
     refetchOnMount: true,
     enabled: !!targetUserId,
   });
-  console.log("Stats object:", stats);
-  console.log("Stats XP:", stats?.xp); // Use optional chaining in the log
+  console.log("Stats object:", stats); // Keep this log
+  console.log("Stats XP:", stats?.xp); // Keep this log
 
   const { data: completedRides, isLoading: ridesLoading } = useQuery({
     queryKey: [isOwnStats ? "/api/my-completed-rides" : "/api/user-completed-rides", targetUserId, { limit: showAllRides ? "all" : "5" }],
@@ -127,7 +129,9 @@ export default function MyStats() {
         },
       });
       if (!response.ok) throw new Error("Failed to fetch completed rides");
-      return response.json();
+      const completedRidesData = await response.json(); // Keep this line to access the data
+      console.log("Fetched completed rides data:", completedRidesData); // Add a log for completed rides data
+      return completedRidesData; // Return the actual data here
     },
     staleTime: 0, // Always fetch fresh data
     gcTime: 0, // Don't cache the data (updated property name)
@@ -160,25 +164,20 @@ export default function MyStats() {
       ? (safeXpIntoCurrentLevel / totalXpForCurrentLevelRange) * 100
       : 0; // If range is 0 or Infinity, progress is 0 (or maxed for Elite)
 
-      // Derive completed ride counts by type from completedActivities data - ADDED
-  const completedSoloRidesCount = useMemo(() => {
-    return completedRides?.soloActivities?.length || 0;
-}, [completedRides]);
-
- const completedOrganizedRidesCount = useMemo(() => {
-  return completedRides?.completedRides?.filter((ride: CompletedRideWithData) => ride.organizerId === targetUserId)?.length || 0
- }, [completedRides, targetUserId]);
-
- const completedJoinedRidesCount = useMemo(() => {
-  return completedRides?.completedRides?.filter((ride: CompletedRideWithData) => ride.organizerId !== targetUserId)?.length || 0;
-  }, [completedRides, targetUserId]);
+  // Derive completed ride counts by type from the stats object - MODIFIED
+  const completedSoloRidesCount = stats?.soloRides || 0;
+  const completedOrganizedRidesCount = stats?.ridesHosted || 0;
+  const completedJoinedRidesCount = stats?.ridesJoined || 0;
 
   const totalCompletedRides = completedSoloRidesCount + completedOrganizedRidesCount + completedJoinedRidesCount;
+
+  console.log("Calculated counts for Donut Chart:", { completedSoloRidesCount, completedOrganizedRidesCount, completedJoinedRidesCount, totalCompletedRides }); // Add this log
+
 
   return (
     <div className="min-h-screen bg-gray-50"> {/* Outer div 1 */}
       <Navbar />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -238,7 +237,7 @@ export default function MyStats() {
                <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
                <div className="w-full bg-gray-200 rounded-full h-8"> {/* Adjusted height */}
                  <div
-                   className="bg-yellow-500 h-3 rounded-full" 
+                   className="bg-yellow-500 h-3 rounded-full"
                     style={{ width: `${levelProgressPercentage}%` }}
                     ></div>
                   </div>
@@ -263,7 +262,7 @@ export default function MyStats() {
                     <CardDescription>(Completed Activities)</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center h-full"> {/* Center content */}
-                    {ridesLoading ? ( // Loading state for donut chart
+                    {statsLoading ? ( // Use statsLoading here as the donut chart data comes from stats
                         <Skeleton className="h-40 w-40 rounded-full" />
                     ) : (
                        <>
@@ -344,7 +343,7 @@ export default function MyStats() {
                {statsLoading ? ( // Loading state for followers
                   <Skeleton className="h-8 w-16" />
                ) : (
-                 <div className="text-2xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
+                 <div className="text-4xl font-bold text-gray-900">{stats?.followersCount || 0}</div>
                )}
               <p className="text-sm text-gray-500">People following {isOwnStats ? 'you' : stats?.user?.name || 'them'}</p>
             </CardContent>
@@ -362,7 +361,7 @@ export default function MyStats() {
               {statsLoading ? ( // Loading state for following
                   <Skeleton className="h-8 w-16" />
               ) : (
-                <div className="text-2xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
+                <div className="text-4xl font-bold text-gray-900">{stats?.followingCount || 0}</div>
               )}
               <p className="text-sm text-gray-500">People {isOwnStats ? "you're" : `${stats?.user?.name || 'they are'}`} following</p>
             </CardContent>
@@ -400,11 +399,11 @@ export default function MyStats() {
                     <RideCard key={ride.id} ride={ride} />
                   ))}
                 </div>
-                
+
                 {!showAllRides && ((completedRides?.completedRides?.length || 0) + (completedRides?.soloActivities?.length || 0)) >= 5 && (
                   <div className="text-center mt-6">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setShowAllRides(true)}
                       className="flex items-center gap-2"
                     >
