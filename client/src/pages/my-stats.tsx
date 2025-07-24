@@ -240,7 +240,7 @@ export default function MyStats() {
                <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
                <div className="w-full bg-gray-200 rounded-full h-3"> {/* Adjusted height */}
                  <div
-                   className="bg-yellow-500 h-3 rounded-full" {/* Adjusted height */}
+                   className="bg-yellow-500 h-3 rounded-full" 
                     style={{ width: `${levelProgressPercentage}%` }}
                     ></div>
                   </div>
