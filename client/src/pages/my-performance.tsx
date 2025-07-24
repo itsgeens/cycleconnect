@@ -269,19 +269,19 @@ export default function MyPerformance() {
                              {userActivityData.xpBreakdown?.distanceXP !== undefined && (
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-4 h-4 text-green-600" /> {/* Icon for Distance */}
-                                <span>Distance: <span className="text-green-600">+{userActivityData.xpBreakdown.distanceXP} XP</span></span>
+                                <span>Distance: <span className="text-green-600">+{userActivityData.xpDistance} XP</span></span>
                               </div>
                           )}
                             {userActivityData.xpBreakdown?.elevationXP !== undefined && (
                               <div className="flex items-center gap-1">
                                 <TrendingUp className="w-4 h-4 text-green-600" /> {/* Icon for Elevation */}
-                                <span>Elevation: <span className="text-green-600">+{userActivityData.xpBreakdown.elevationXP} XP</span></span>
+                                <span>Elevation: <span className="text-green-600">+{userActivityData.xpElevation} XP</span></span>
                               </div>
                           )}
                             {userActivityData.xpBreakdown?.speedXP !== undefined && (
                               <div className="flex items-center gap-1">
                                 <Zap className="w-4 h-4 text-green-600" /> {/* Icon for Speed */}
-                                <span>Speed: <span className="text-green-600">+{userActivityData.xpBreakdown.speedXP} XP</span></span>
+                                <span>Speed: <span className="text-green-600">+{userActivityData.xpSpeed} XP</span></span>
                             </div>
                           )}
                         </div>

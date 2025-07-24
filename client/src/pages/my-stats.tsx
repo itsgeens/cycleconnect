@@ -241,7 +241,7 @@ export default function MyStats() {
                <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
                <div className="w-full bg-gray-200 rounded-full h-8"> {/* Adjusted height */}
                  <div
-                   className="bg-yellow-500 h-3 rounded-full"
+                   className="bg-yellow-500 h-8 rounded-full"
                     style={{ width: `${levelProgressPercentage}%` }}
                     ></div>
                   </div>
@@ -266,6 +266,7 @@ export default function MyStats() {
                     <CardDescription>(Completed Activities)</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center h-full"> {/* Center content */}
+                  <div className="flex items-center justify-center w-full h-full">
                     {statsLoading ? ( // Use statsLoading here as the donut chart data comes from stats
                         <Skeleton className="h-40 w-40 rounded-full" />
                     ) : (
@@ -280,6 +281,7 @@ export default function MyStats() {
                            />
                        </>
                     )}
+                  </div>
                 </CardContent>
             </Card>
 
@@ -337,7 +339,7 @@ export default function MyStats() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"> {/* Using a 2-column grid for this section */}
           <Card className="cursor-pointer hover:shadow-lg transition-shadow md:col-span-1"> {/* Spans 1 column on medium screens and up */}
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="text-4xl font-medium text-gray-600 flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Followers
                 <ExternalLink className="h-3 w-3 ml-auto" />
@@ -355,7 +357,7 @@ export default function MyStats() {
 
           <Card className="cursor-pointer hover:shadow-lg transition-shadow md:col-span-1"> {/* Spans 1 column on medium screens and up */}
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="text-4xl font-medium text-gray-600 flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
                 Following
                 <ExternalLink className="h-3 w-3 ml-auto" />
