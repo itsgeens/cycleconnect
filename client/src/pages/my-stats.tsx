@@ -235,7 +235,7 @@ export default function MyStats() {
           </div>
 
           {stats?.xp !== undefined && currentLevel < 9 && ( // Show progress bar only if XP is available and not Elite
-             <div className="w-full md:w-1/2 lg:w-1/3"> {/* Progress bar takes available width */}
+             <div className="w-full md:w-2/3 lg:w-1/2"> {/* Progress bar takes available width */}
                <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
                <div className="w-full bg-gray-200 rounded-full h-3"> {/* Adjusted height */}
                  <div
@@ -253,7 +253,7 @@ export default function MyStats() {
           </Card>
 
             {/* Second Row: Ride Count (2x2), Total Distance (1x3), Total Elevation (1x3) */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8"> {/* Using a 5-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"> {/* Using a 5-column grid */}
             {/* Ride Count Card (2x2) */}
             <Card className="md:col-span-2 md:row-span-2"> {/* Spans 2 columns and 2 rows on medium screens and up */}
                 <CardHeader className="pb-2">
@@ -274,6 +274,7 @@ export default function MyStats() {
                                    { name: 'Organized Rides', value: completedOrganizedRidesCount },
                                    { name: 'Joined Rides', value: completedJoinedRidesCount },
                                ]}
+                               totalCompletedRides={totalCompletedRides} // Pass the total count
                            />
                          {/* Simple text representation if chart not available */}
                          <div className="text-center">
@@ -286,8 +287,8 @@ export default function MyStats() {
             </Card>
 
 
-            {/* Total Distance Card (1x3) */}
-            <Card className="md:col-span-3"> {/* Spans 3 columns on medium screens and up */}
+            {/* Total Distance Card (1x2) */}
+            <Card className="md:col-span-2"> {/* Spans 3 columns on medium screens and up */}
               <CardHeader className="pb-2">
                 <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
                   <Route className="h-6 w-6 text-green-500" />
@@ -310,8 +311,8 @@ export default function MyStats() {
               </CardContent>
             </Card>
 
-               {/* Total Elevation Card (1x3) */}
-            <Card className="md:col-span-3"> {/* Spans 3 columns on medium screens and up */}
+               {/* Total Elevation Card (1x2) */}
+            <Card className="md:col-span-2"> {/* Spans 3 columns on medium screens and up */}
               <CardHeader className="pb-2">
                 <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
                   <Mountain className="h-6 w-6 text-purple-500" />

@@ -3,17 +3,14 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 
 interface DonutChartProps {
   data: { name: string; value: number }[];
+  totalCompletedRides: number; // Add totalCompletedRides prop
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042']; // Define some colors
 
-const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
+const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) => {
   // Filter out data with zero value so they don't appear in the chart
   const chartData = data.filter(item => item.value > 0);
-
-  if (chartData.length === 0) {
-    return <div className="text-center text-gray-500">No data to display chart</div>;
-  }
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -22,8 +19,8 @@ const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
           data={chartData}
           cx="50%"
           cy="50%"
-          innerRadius={60} // Adjust as needed
-          outerRadius={80} // Adjust as needed
+          innerRadius={80} // Adjust as needed
+          outerRadius={100} // Adjust as needed
           fill="#8884d8"
           paddingAngle={2} // Adjust as needed
           dataKey="value"
@@ -34,6 +31,15 @@ const DonutChart: React.FC<DonutChartProps> = ({ data }) => {
         </Pie>
         <Tooltip />
         <Legend />
+        <text
+          x="50%"
+          y="50%"
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="text-2xl font-bold text-gray-800" // Apply Tailwind classes for styling
+        >
+          {totalCompletedRides}
+        </text>
       </PieChart>
     </ResponsiveContainer>
   );
