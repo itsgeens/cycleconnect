@@ -9,14 +9,14 @@ interface DonutChartProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042']; // Define some colors
 
 const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) => {
-  // Filter out data with zero value so they don't appear in the chart
-  const chartData = data.filter(item => item.value > 0);
+  // REMOVED: Filter out data with zero value so they don't appear in the chart
+  // const chartData = data.filter(item => item.value > 0);
 
   return (
     <ResponsiveContainer width="100%" height={300}>
       <PieChart>
         <Pie
-          data={chartData}
+          data={data}
           cx="50%"
           cy="50%"
           innerRadius={80} // Adjust as needed
@@ -25,7 +25,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) =>
           paddingAngle={2} // Adjust as needed
           dataKey="value"
         >
-          {chartData.map((entry, index) => (
+          {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>

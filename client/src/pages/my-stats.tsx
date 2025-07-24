@@ -208,7 +208,6 @@ export default function MyStats() {
             </Select>
           </div>
         </div>
-         ) : (
              {/* Full-width XP Card */}
             <Card className="lg:col-span-3"> {/* This card spans all 3 columns on large screens */}
               <CardHeader className="pb-2">
@@ -237,7 +236,7 @@ export default function MyStats() {
           {stats?.xp !== undefined && currentLevel < 9 && ( // Show progress bar only if XP is available and not Elite
              <div className="w-full md:w-2/3 lg:w-1/2"> {/* Progress bar takes available width */}
                <p className="text-sm text-gray-600 mb-1">Progress to Level {currentLevel + 1}</p> {/* Adjusted text size */}
-               <div className="w-full bg-gray-200 rounded-full h-3"> {/* Adjusted height */}
+               <div className="w-full bg-gray-200 rounded-full h-8"> {/* Adjusted height */}
                  <div
                    className="bg-yellow-500 h-3 rounded-full" 
                     style={{ width: `${levelProgressPercentage}%` }}
@@ -253,7 +252,7 @@ export default function MyStats() {
           </Card>
 
             {/* Second Row: Ride Count (2x2), Total Distance (1x3), Total Elevation (1x3) */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"> {/* Using a 5-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 mt-8"> {/* Using a 5-column grid */}
             {/* Ride Count Card (2x2) */}
             <Card className="md:col-span-2 md:row-span-2"> {/* Spans 2 columns and 2 rows on medium screens and up */}
                 <CardHeader className="pb-2">
@@ -276,11 +275,6 @@ export default function MyStats() {
                                ]}
                                totalCompletedRides={totalCompletedRides} // Pass the total count
                            />
-                         {/* Simple text representation if chart not available */}
-                         <div className="text-center">
-                             <div className="text-5xl font-bold text-gray-900 mb-2">{totalCompletedRides}</div> {/* Total in center */}
-                             <p className="text-sm text-gray-600">Total Completed Rides</p>
-                         </div>
                        </>
                     )}
                 </CardContent>
@@ -295,11 +289,11 @@ export default function MyStats() {
                   Total Distance
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="text-center">
                 {statsLoading ? ( // Loading state for distance
                     <Skeleton className="h-8 w-24 mb-2" />
                 ) : (
-                   <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.totalDistance || 0} km</div>
+                   <div className="text-4xl font-bold text-gray-900 mb-1">{stats?.totalDistance || 0} km</div>
                 )}
                 {statsLoading ? ( // Loading state for distance change
                     <Skeleton className="h-4 w-20" />
@@ -319,11 +313,11 @@ export default function MyStats() {
                   Total Elevation
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="text-center">
                  {statsLoading ? ( // Loading state for elevation
                     <Skeleton className="h-8 w-24 mb-2" />
                  ) : (
-                   <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.totalElevation || 0} m</div>
+                   <div className="text-4xl font-bold text-gray-900 mb-1">{stats?.totalElevation || 0} m</div>
                  )}
                  {statsLoading ? ( // Loading state for elevation change
                     <Skeleton className="h-4 w-20" />
@@ -346,7 +340,7 @@ export default function MyStats() {
                 <ExternalLink className="h-3 w-3 ml-auto" />
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-center">
                {statsLoading ? ( // Loading state for followers
                   <Skeleton className="h-8 w-16" />
                ) : (
@@ -364,7 +358,7 @@ export default function MyStats() {
                 <ExternalLink className="h-3 w-3 ml-auto" />
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-center">
               {statsLoading ? ( // Loading state for following
                   <Skeleton className="h-8 w-16" />
               ) : (
