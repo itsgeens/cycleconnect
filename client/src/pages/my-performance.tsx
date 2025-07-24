@@ -9,6 +9,8 @@ import GPXMapPreview from "@/components/gpx-map-preview";
 import { ArrowLeft, Clock, Route, Mountain, Zap, Heart } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
+import { Trophy } from "lucide-react";
+
 
 export default function MyPerformance() {
   const { id } = useParams<{ id: string }>();

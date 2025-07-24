@@ -97,6 +97,8 @@ export default function MyStats() {
     refetchOnMount: true,
     enabled: !!targetUserId,
   });
+  console.log("Stats object:", stats);
+  console.log("Stats XP:", stats?.xp); // Use optional chaining in the log
 
   const { data: completedRides, isLoading: ridesLoading } = useQuery({
     queryKey: [isOwnStats ? "/api/my-completed-rides" : "/api/user-completed-rides", targetUserId, { limit: showAllRides ? "all" : "5" }],

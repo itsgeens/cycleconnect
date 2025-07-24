@@ -268,7 +268,7 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
   deviceName: true,
   deviceType: true,
   completedAt: true,
-  xp: true,
+  xpEarned: true,
 }).extend({
   activityType: z.enum(["cycling", "running", "walking", "other"]),
   deviceType: z.enum(["cycling_computer", "smartwatch", "phone", "manual"]).optional(),

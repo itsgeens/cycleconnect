@@ -1254,11 +1254,19 @@ export class DatabaseStorage implements IStorage {
         const elevationGain = insertData.elevationGain ? parseFloat(insertData.elevationGain.toString()) : 0;
         const averageSpeed = insertData.averageSpeed ? parseFloat(insertData.averageSpeed.toString()) : 0;
     
+        console.log(`[createSoloActivity] Calculating XP for activity: ${insertData.name}`);
+        console.log(`[createSoloActivity] Distance: ${distance}`);
+        console.log(`[createSoloActivity] Elevation Gain: ${elevationGain}`);
+        console.log(`[createSoloActivity] Average Speed: ${averageSpeed}`);
+
         // Calculate XP: distance + elevation + speed (using the revised multiplier)
         const earnedXp = (distance * 0.05) + (elevationGain * 0.01) + (averageSpeed * 0.1);
     
         // Round the earned XP to the nearest integer
         const roundedEarnedXp = Math.round(earnedXp);
+
+        console.log(`[createSoloActivity] Calculated raw XP: ${earnedXp}`);
+        console.log(`[createSoloActivity] Rounded earned XP: ${roundedEarnedXp}`);
     
         // Add the calculated XP to the insert data
         // Assuming your soloActivities schema has an 'xp' column
