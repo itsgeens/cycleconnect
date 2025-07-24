@@ -20,7 +20,7 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) =>
           cx="50%"
           cy="50%"
           innerRadius={60} // Reduced radius
-          outerRadius={80} // Reduced radius
+          outerRadius={100} // Reduced radius
           fill="#8884d8"
           paddingAngle={2} // Adjust as needed
           dataKey="value"
@@ -30,13 +30,12 @@ const DonutChart: React.FC<DonutChartProps> = ({ data, totalCompletedRides }) =>
           ))}
         </Pie>
         <Tooltip />
-        <Legend />
         <text
           x="50%"
           y="50%"
           textAnchor="middle"
-          dominantBaseline="central"
-          className="text-2xl font-bold text-gray-800" // Apply Tailwind classes for styling
+          dominantBaseline="middle"
+          className="text-4xl font-bold text-gray-900" // Apply Tailwind classes for styling
         >
           {totalCompletedRides}
         </text>

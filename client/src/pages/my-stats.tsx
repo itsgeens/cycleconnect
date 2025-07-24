@@ -265,7 +265,7 @@ export default function MyStats() {
                     </CardTitle>
                     <CardDescription>(Completed Activities)</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center h-[250px] py-0"> {/* Center content */}
+                <CardContent className="flex flex-col items-center justify-center h-[300px] py-0"> {/* Center content */}
                   <div className="flex items-center justify-center w-full h-full">
                     {statsLoading ? ( // Use statsLoading here as the donut chart data comes from stats
                         <Skeleton className="h-40 w-40 rounded-full" />
