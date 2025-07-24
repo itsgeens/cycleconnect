@@ -206,8 +206,9 @@ export default function MyStats() {
                 <CardContent>
                   {stats?.xp !== undefined ? ( // Check if totalXp exists in the fetched stats
                     <>
-                      <div className="text-2xl font-bold text-gray-900">{stats.totalXp.toFixed(2)}</div> {/* Format to 2 decimal places */}
-                        {stats.xp !== undefined ? stats.xp.toFixed(2) : 'N/A'}
+                      <div className="text-2xl font-bold text-gray-900">
+                        {stats.xp.toFixed(2)} {/* Correctly using stats.xp */}
+                      </div>
                       <p className="text-sm text-gray-500">
                        Level {currentLevel}: {getLevelName(currentLevel)} {/* Display Level number and name */}
                       </p>
@@ -215,13 +216,6 @@ export default function MyStats() {
                      ) : (
                       <div className="text-2xl font-bold text-gray-900">N/A</div> // Display N/A if XP is not available
                     )}
-    
-                  {/* You might also want to show XP change if your backend provides it */}
-                  {/* {stats?.totalXpChange !== undefined && (
-                    <Badge variant="secondary" className="mt-1">
-                      {stats.totalXpChange >= 0 ? '+' : ''}{stats.totalXpChange.toFixed(2)} from previous
-                    </Badge>
-                  )} */}
                 </CardContent>
                 {stats?.xp !== undefined && ( // Only show if stats and totalXp are available
                   <div className="px-6 pb-4"> {/* Add padding to align with CardContent */}
