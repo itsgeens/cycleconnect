@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { authManager } from "@/lib/auth";
 import DonutChart from "@/components/donut-chart";
 import {
+  ArrowLeft,
+  Clock,
+  Zap,
+  Heart,
   Calendar,
   TrendingUp,
   Mountain,

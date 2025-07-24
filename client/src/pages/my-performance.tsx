@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useGPXStats } from "@/hooks/use-gpx-stats";
 import { authManager } from "@/lib/auth";
 import GPXMapPreview from "@/components/gpx-map-preview";
-import { ArrowLeft, Clock, Route, Mountain, Zap, Heart } from "lucide-react";
+import { ArrowLeft, Clock, Route, Mountain, Zap, Heart, MapPin, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { type Ride } from "@shared/schema";
 import { Trophy } from "lucide-react";
@@ -29,6 +29,7 @@ export default function MyPerformance() {
     queryKey: ['/api/solo-activities', id],
     enabled: !!id && isSolo,
   });
+  
 
   const isLoading = isLoadingRide || isLoadingSolo;
   const activity = isSolo ? soloActivity : ride;
@@ -265,17 +266,25 @@ export default function MyPerformance() {
                      {/* XP Breakdown (for activities with breakdown data) */}
                      {(userActivityData.xpDistance !== undefined || userActivityData.xpElevation !== undefined || userActivityData.xpSpeed !== undefined) && (
                          <div className="ml-8 mt-2 text-sm text-gray-600 space-y-1"> {/* Indent the breakdown */}
-                             <p>Breakdown:</p>
-                             {userActivityData.xpDistance !== undefined && (
-                                 <p>- Distance: {userActivityData.xpDistance} XP</p>
-                             )}
-                              {userActivityData.xpElevation !== undefined && (
-                                 <p>- Elevation: {userActivityData.xpElevation} XP</p>
-                             )}
-                             {userActivityData.xpSpeed !== undefined && (
-                                 <p>- Speed: {userActivityData.xpSpeed} XP</p>
-                             )}
-                         </div>
+                             {userActivityData.xpBreakdown?.distanceXP !== undefined && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-4 h-4 text-green-600" /> {/* Icon for Distance */}
+                                <span>Distance: <span className="text-green-600">+{userActivityData.xpBreakdown.distanceXP} XP</span></span>
+                              </div>
+                          )}
+                            {userActivityData.xpBreakdown?.elevationXP !== undefined && (
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className="w-4 h-4 text-green-600" /> {/* Icon for Elevation */}
+                                <span>Elevation: <span className="text-green-600">+{userActivityData.xpBreakdown.elevationXP} XP</span></span>
+                              </div>
+                          )}
+                            {userActivityData.xpBreakdown?.speedXP !== undefined && (
+                              <div className="flex items-center gap-1">
+                                <Zap className="w-4 h-4 text-green-600" /> {/* Icon for Speed */}
+                                <span>Speed: <span className="text-green-600">+{userActivityData.xpBreakdown.speedXP} XP</span></span>
+                            </div>
+                          )}
+                        </div>
                      )}
 
                      {/* Organizing Bonus (only for organizer's GPX) */}
@@ -290,7 +299,7 @@ export default function MyPerformance() {
                {/* Joining Bonus (only for participant's participation) */}
                {userParticipationData?.xpJoiningBonus !== undefined && userParticipationData.xpJoiningBonus > 0 && (
                     <div className="flex items-center gap-3 mt-4"> {/* Add spacing */}
-                       <Users className="w-5 h-5 text-blue-500" /> {/* Using Users icon for Joining Bonus */}
+                       <user className="w-5 h-5 text-blue-500" /> {/* Using Users icon for Joining Bonus */}
                        <div>
                           <p className="font-medium">Joining Bonus</p>
                           <p className="text-lg font-bold text-blue-600">
