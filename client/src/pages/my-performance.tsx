@@ -33,6 +33,7 @@ export default function MyPerformance() {
   const isLoading = isLoadingRide || isLoadingSolo;
   const activity = isSolo ? soloActivity : ride;
   const userActivityData = isSolo ? soloActivity : (ride as any)?.userActivityData;
+  const userParticipationData = isSolo ? undefined : (ride as any)?.userParticipationData;
   const { stats } = useGPXStats(userActivityData?.gpxFilePath);
   const { stats: organizerStats } = useGPXStats(!isSolo ? activity?.gpxFilePath : null);
 
