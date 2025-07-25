@@ -169,23 +169,56 @@ export default function UploadActivityPage() {
     });
   };
 
-  const handleUploadAsSolo = () => {
-    if (!file) return;
-    setIsUploading(true);
-    
-    const formData = new FormData();
-    formData.append("gpx", file);
-    formData.append("isOrganizerOverride", "true");
-    
-    fetch("/api/upload-activity", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${localStorage.getItem("sessionId") || ""}`,
-      },
-      body: formData,
-    })
-    .then(response => response.json())
-    .then(data => {
+  const handleUploadAsSolo = async () => { // Make the function async
+    // Determine which data source to use (manual prompt or auto-match confirmation)
+    const sourceData = organizerPromptData || autoMatchConfirmationData;
+
+    if (!sourceData || !file) { // Add file check here
+      toast({
+        title: "Error",
+        description: "Activity data missing. Please try uploading again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true); // Use isUploading state for the solo upload
+
+    try {
+      // Prepare the data to send to the solo activities endpoint
+      const soloActivityData = {
+        // Include all the necessary fields for insertSoloActivitySchema
+        name: `Manual Activity - ${new Date().toLocaleDateString()}`, // Or allow user to name it
+        description: `Solo cycling activity uploaded manually`,
+        activityType: 'cycling', // Or allow user to select
+        gpxFilePath: sourceData.tempFilePath, // Use the temporary file path from the prompt/auto-match response
+        distance: sourceData.gpxData.distance?.toString(), // Ensure it's a string if needed
+        duration: sourceData.gpxData.duration,
+        movingTime: sourceData.gpxData.movingTime,
+        elevationGain: sourceData.gpxData.elevationGain?.toString(), // Ensure it's a string if needed
+        averageSpeed: sourceData.gpxData.averageSpeed?.toString(), // Ensure it's a string if needed
+        averageHeartRate: sourceData.gpxData.averageHeartRate,
+        maxHeartRate: sourceData.gpxData.maxHeartRate,
+        calories: sourceData.gpxData.calories,
+        deviceName: sourceData.gpxData.deviceName || 'Manual Upload', // Get from gpxData if available
+        deviceType: sourceData.gpxData.deviceType || 'manual',     // Get from gpxData if available
+        completedAt: sourceData.gpxData.startTime ? new Date(sourceData.gpxData.startTime) : new Date(), // Use GPX start time or current date
+        // userId will be added on the backend via requireAuth
+      };
+
+      // Call the /api/solo-activities endpoint directly
+      const response = await apiRequest('/api/solo-activities', {
+        method: 'POST',
+        data: soloActivityData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create solo activity");
+      }
+
+      const soloActivity = await response.json();
+
       toast({
         title: "Solo activity created!",
         description: "Your GPX file has been uploaded as a solo activity.",
@@ -194,18 +227,19 @@ export default function UploadActivityPage() {
       setOrganizerPromptData(null);
       setAutoMatchConfirmationData(null); // Clear auto-match data
       navigate("/activities");
-    })
-    .catch(error => {
+
+    } catch (error: any) {
+      console.error("Upload as solo activity failed:", error); // Log the error
       toast({
         title: "Upload failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
-    })
-    .finally(() => {
+    } finally {
       setIsUploading(false);
-    });
+    }
   };
+
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -320,9 +354,10 @@ export default function UploadActivityPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   <strong>Your Activity Data:</strong><br />
-                  Distance: {organizerPromptData.gpxData.distance?.toFixed(1)} km | 
-                  Duration: {formatDuration(organizerPromptData.gpxData.duration)} | 
-                  Elevation: {organizerPromptData.gpxData.elevationGain?.toFixed(0)}m
+                  Distance: {organizerPromptData.gpxData?.distance?.toFixed(1) ?? 'N/A'} km |
+                  Duration: {formatDuration(organizerPromptData.gpxData?.duration || 0)} |
+                  Elevation: {organizerPromptData.gpxData?.elevationGain?.toFixed(0) ?? 'N/A'}m
+
                 </AlertDescription>
               </Alert>
 

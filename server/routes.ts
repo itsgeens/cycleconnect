@@ -895,6 +895,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             matchScore: autoMatch.matchScore,
             rideName: autoMatch.rideName,
             rideId: autoMatch.rideId
+            gpxData: { // Include the parsed gpxData
+              distance: gpxData.distance,
+              duration: gpxData.duration,
+              movingTime: gpxData.movingTime,
+              elevationGain: gpxData.elevationGain,
+              averageSpeed: gpxData.averageSpeed,
+              averageHeartRate: gpxData.averageHeartRate,
+              maxHeartRate: gpxData.maxHeartRate,
+              calories: gpxData.calories,
+              deviceName: gpxData.deviceName,
+              deviceType: gpxData.deviceType,
+              startTime: gpxData.startTime,
+              endTime: gpxData.endTime,
+              name: gpxData.name,
+              description: gpxData.description,
+            }
           });
         } else {
           // No auto-match for organizer - prompt for manual decision
