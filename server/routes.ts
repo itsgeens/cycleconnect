@@ -915,7 +915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Auto-match successful, creating organizer GPX record.');
 
           // Calculate organizing bonus XP - ADDED
-          const organizingBonusXp = 50; // Example bonus XP for organizing
+          const organizingBonusXp = 1; // Example bonus XP for organizing
 
            // Calculate total earned XP for organizer GPX - ADDED
           const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed + organizingBonusXp;

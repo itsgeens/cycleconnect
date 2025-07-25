@@ -266,19 +266,19 @@ export default function MyPerformance() {
                      {/* XP Breakdown (for activities with breakdown data) */}
                      {(userActivityData.xpDistance !== undefined || userActivityData.xpElevation !== undefined || userActivityData.xpSpeed !== undefined) && (
                          <div className="ml-8 mt-2 text-sm text-gray-600 space-y-1"> {/* Indent the breakdown */}
-                             {userActivityData.xpBreakdown?.distanceXP !== undefined && (
+                             {userActivityData.xpDistance !== undefined && userActivityData.xpDistance !== null && ( // Modified condition
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-4 h-4 text-green-600" /> {/* Icon for Distance */}
                                 <span>Distance: <span className="text-green-600">+{userActivityData.xpDistance} XP</span></span>
                               </div>
                           )}
-                            {userActivityData.xpBreakdown?.elevationXP !== undefined && (
+                            {userActivityData.xpElevation !== undefined && userActivityData.xpElevation !== null && ( // Modified condition
                               <div className="flex items-center gap-1">
                                 <TrendingUp className="w-4 h-4 text-green-600" /> {/* Icon for Elevation */}
                                 <span>Elevation: <span className="text-green-600">+{userActivityData.xpElevation} XP</span></span>
                               </div>
                           )}
-                            {userActivityData.xpBreakdown?.speedXP !== undefined && (
+                            {userActivityData.xpSpeed !== undefined && userActivityData.xpSpeed !== null && ( // Modified condition
                               <div className="flex items-center gap-1">
                                 <Zap className="w-4 h-4 text-green-600" /> {/* Icon for Speed */}
                                 <span>Speed: <span className="text-green-600">+{userActivityData.xpSpeed} XP</span></span>

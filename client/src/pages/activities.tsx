@@ -13,6 +13,75 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Trophy, Clock, MapPin, Users, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ParticipantActivityMatch } from "@/components/activity-card"; // Import ParticipantActivityMatch explicitly
+
+// Define interfaces for ride data in "My Rides"
+interface UserRide {
+  id: number;
+  name: string;
+  description: string | null;
+  dateTime: string; // Or Date if you parse it
+  rideType: string;
+  surfaceType: string;
+  gpxFilePath: string | null;
+  meetupLocation: string | null;
+  meetupCoords: { lat: number; lng: number } | null;
+  organizerId: number;
+  isCompleted: boolean;
+  completedAt: string | null; // Or Date if you parse it
+  createdAt: string; // Or Date
+  weatherData: any; // You might want to define a specific type for weather data
+  organizerName: string;
+  participantCount: number;
+  // Properties specific to the 'all' array
+  isOrganizer?: boolean;
+  isParticipant?: boolean;
+}
+
+interface MyRidesData {
+  all: UserRide[];
+  organized: UserRide[];
+  joined: UserRide[];
+}
+
+// Define interfaces for completed activities data
+// Reuse ParticipantActivityMatch or define a similar interface if needed
+interface CompletedRideWithUserData extends UserRide {
+  userActivityData?: ParticipantActivityMatch; // Assuming structure from storage.ts
+  userParticipationData?: { xpJoiningBonus?: number | null } | null; // Assuming structure from storage.ts
+}
+
+interface SoloActivityData {
+  id: number;
+  userId: number;
+  name: string;
+  description: string | null;
+  activityType: string;
+  gpxFilePath: string | null;
+  distance: string | null; // Or number
+  duration: number | null;
+  movingTime: number | null;
+  elevationGain: string | null; // Or number
+  averageSpeed: string | null; // Or number
+  averageHeartRate: number | null;
+  maxHeartRate: number | null;
+  calories: number | null;
+  deviceName: string | null;
+  deviceType: string | null;
+  completedAt: string | Date; // Or Date
+  createdAt: string | Date; // Or Date
+  xpEarned: number | null;
+  xpDistance: number | null;
+  xpElevation: number | null;
+  xpSpeed: number | null;
+  xpOrganizingBonus: number | null;
+}
+
+
+interface CompletedActivitiesData {
+  completedRides: CompletedRideWithUserData[];
+  soloActivities: SoloActivityData[];
+}
 
 export default function Activities() {
   const user = authManager.getState().user;
@@ -75,9 +144,13 @@ export default function Activities() {
   });
 
   const handleLeaveClick = (rideId: number) => {
-    const ride = myRides?.all?.find((r: any) => r.id === rideId) || 
-                 myRides?.joined?.find((r: any) => r.id === rideId) || 
-                 myRides?.organized?.find((r: any) => r.id === rideId);
+    // Access myRides only if it's not null or undefined
+    const ride = myRides
+      ? myRides.all.find((r) => r.id === rideId) ||
+        myRides.joined.find((r) => r.id === rideId) ||
+        myRides.organized.find((r) => r.id === rideId)
+      : undefined; // Return undefined if myRides is null or undefined
+
     setSelectedRide(ride);
     setShowLeaveModal(true);
   };
@@ -108,16 +181,30 @@ export default function Activities() {
       </div>
     );
   }
+// Safely access data from myRides and completedActivities
+const plannedActivities = myRides
+? [...(myRides.organized ?? []), ...(myRides.joined ?? [])].filter(
+    (ride) => !ride.isCompleted
+  )
+: []; // Provide an empty array if myRides is undefined
 
-  const plannedActivities = [
-    ...(myRides?.organized || []),
-    ...(myRides?.joined || [])
-  ].filter(ride => !ride.isCompleted);
+const allCompletedActivities = completedActivities
+? [ 
+    ...(completedActivities.completedRides ?? []),
+    ...(completedActivities.soloActivities ?? []),
+  ].sort((a, b) => {
+    // Add checks for null or undefined completedAt/createdAt
+    const dateA = a.completedAt || a.createdAt;
+    const dateB = b.completedAt || b.createdAt;
 
-  const allCompletedActivities = [
-    ...(completedActivities?.completedRides || []),
-    ...(completedActivities?.soloActivities || [])
-  ].sort((a, b) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime());
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  })
+: []; // Provide an empty array if completedActivities is undefined
+
 
   // Filter completed activities based on user data availability
   const filteredCompletedActivities = showRidesWithoutData 
@@ -290,6 +377,7 @@ export default function Activities() {
                       key={activity.gpxFilePath && !activity.organizerId ? `solo-${activity.id}` : `group-${activity.id}`}
                       activity={activity}
                       type={activity.gpxFilePath && !activity.organizerId ? 'solo' : 'group'}
+                      queryClient={queryClient} // Pass queryClient as a prop
                     />
                   ))}
                 </div>

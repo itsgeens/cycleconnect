@@ -693,6 +693,60 @@ export class DatabaseStorage implements IStorage {
     console.log(`[completeRide] Finished participant joining bonus XP processing.`);
     // --- End Participant Joining Bonus XP Processing ---
 
+
+    // --- Calculate and Add Incremental Organizer XP ---
+
+    console.log(`[completeRide] Calculating incremental organizer XP for ride ${rideId}.`);
+
+    // 1. Fetch all activity matches for this ride again to count participants with GPX
+    const allActivityMatchesForRide = await db
+        .select()
+        .from(activityMatches)
+        .where(eq(activityMatches.rideId, rideId));
+
+    // 2. Count participants with uploaded GPX files
+    const participantsWithGpxCount = allActivityMatchesForRide.filter(
+        activity => activity.gpxFilePath !== null && activity.gpxFilePath !== undefined
+    ).length;
+
+    console.log(`[completeRide] Found ${participantsWithGpxCount} participants with uploaded GPX for ride ${rideId}.`);
+
+    // 3. Define incremental XP per participant
+    const incrementalXpPerParticipant = 5; // Example: 5 XP per participant with GPX
+
+    // 4. Calculate total incremental XP for the organizer
+    const totalIncrementalOrganizerXp = participantsWithGpxCount * incrementalXpPerParticipant;
+
+    console.log(`[completeRide] Calculated total incremental organizer XP: ${totalIncrementalOrganizerXp}.`);
+
+    // 5. Add the incremental XP to the organizer's total XP
+    if (totalIncrementalOrganizerXp > 0) {
+        // Fetch the ride again to get the organizerId
+        const [ride] = await db.select().from(rides).where(eq(rides.id, rideId)).limit(1);
+        if (ride?.organizerId) {
+            await this.incrementUserXP(ride.organizerId, totalIncrementalOrganizerXp);
+            console.log(`[completeRide] Added ${totalIncrementalOrganizerXp} incremental XP to organizer ${ride.organizerId} for ride ${rideId}.`);
+
+            // Optionally, update the organizerGpxFiles record with this bonus if it exists
+            const [organizerGpx] = await db.select().from(organizerGpxFiles).where(eq(organizerGpxFiles.rideId, rideId)).limit(1);
+            if (organizerGpx) {
+                const currentOrganizingBonus = organizerGpx.xpOrganizingBonus || 0;
+                await db.update(organizerGpxFiles)
+                        .set({ xpOrganizingBonus: currentOrganizingBonus + totalIncrementalOrganizerXp })
+                        .where(eq(organizerGpxFiles.id, organizerGpx.id));
+                console.log(`[completeRide] Updated organizerGpxFiles record ${organizerGpx.id} with incremental bonus.`);
+            }
+
+        } else {
+            console.warn(`[completeRide] Could not find organizerId for ride ${rideId} to award incremental XP.`);
+        }
+    } else {
+        console.log(`[completeRide] No incremental organizer XP to add for ride ${rideId}.`);
+    }
+
+    // --- End Calculate and Add Incremental Organizer XP ---
+
+
     // --- Organizer XP Calculation Removed ---
     // The XP calculation for the organizer's GPX or the organizing bonus
     // is removed from here. It will happen in the /api/upload-activity

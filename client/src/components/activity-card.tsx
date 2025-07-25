@@ -41,10 +41,34 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGPXStats } from "@/hooks/use-gpx-stats";
 
+
+export interface ParticipantActivityMatch {
+  id: number;
+  rideId: number;
+  userId: number;
+  deviceId: string;
+  routeMatchPercentage: string;
+  gpxFilePath: string;
+  distance: string | null;
+  duration: number | null;
+  movingTime: number | null;
+  elevationGain: string | null;
+  averageSpeed: string | null;
+  averageHeartRate: number | null;
+  maxHeartRate: number | null;
+  calories: number | null;
+  completedAt: Date | null;
+  matchedAt: Date | null;
+  userName: string;
+}
+
 interface ActivityCardProps {
   activity: any;
   type: 'group' | 'solo';
+  queryClient: ReturnType<typeof useQueryClient>; // Add queryClient prop
 }
+
+
 // Helper function to calculate user level based on XP
 const calculateLevel = (xp: number): number => {
   // Simple leveling formula: 100 XP per level starting at level 1
@@ -52,12 +76,11 @@ const calculateLevel = (xp: number): number => {
   return Math.floor(xp / 100) + 1;
 };
 
-export default function ActivityCard({ activity, type }: ActivityCardProps) {
+export default function ActivityCard({ activity, type, queryClient }: ActivityCardProps) {
   const [, navigate] = useLocation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { stats } = useGPXStats(activity.gpxFilePath);
 
   const formatDuration = (seconds: number) => {
@@ -104,12 +127,34 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
     mutationFn: (activityId: number) => apiRequest(`/api/activities/${activityId}`, {
       method: 'DELETE',
     }),
-    onSuccess: () => {
+    onSuccess: (_, activityId) => { // Receive the activityId from the mutation variables
       toast({
         title: "Success",
         description: "Activity deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+      // Manually update the cache of the '/api/completed-activities' query
+      queryClient.setQueryData(["/api/completed-activities"], (oldData: any) => {
+      if (!oldData) return oldData;
+
+      // Assuming the structure is { completedRides: [], soloActivities: [] }
+      // We need to find and remove the activity from either completedRides or soloActivities
+      const updatedCompletedRides = (oldData.completedRides || []).filter(
+        (activity: any) => activity.id !== activityId
+      );
+      const updatedSoloActivities = (oldData.soloActivities || []).filter(
+        (activity: any) => activity.id !== activityId
+      );
+
+      return {
+        ...oldData,
+        completedRides: updatedCompletedRides,
+        soloActivities: updatedSoloActivities,
+      };
+    });
+
+    // Close the delete dialog after successful deletion
+    setShowDeleteDialog(false);
+    // No need to invalidate queries here as the cache is updated directly
     },
     onError: (error: any) => {
       toast({
@@ -129,7 +174,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
   const isGroup = type === 'group';
 
   // Query to get activity matches for group rides
-  const { data: activityMatches, isLoading: isLoadingMatches } = useQuery({
+  const { data: activityMatches, isLoading: isLoadingMatches } = useQuery<ParticipantActivityMatch[]>({
     queryKey: ["/api/rides", activity.id, "activity-matches"],
     enabled: isGroup && showParticipantsModal,
   });
@@ -485,7 +530,7 @@ export default function ActivityCard({ activity, type }: ActivityCardProps) {
                 <div className="flex justify-center py-4">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                 </div>
-              ) : activityMatches?.length > 0 ? (
+              ) : activityMatches && activityMatches.length > 0 ? ( // Modified condition
                 activityMatches.map((participant: any) => (
                   <div
                     key={participant.id}
