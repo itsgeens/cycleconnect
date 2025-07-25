@@ -12,6 +12,7 @@ export interface GpxData {
   maxHeartRate?: number; // in bpm
   calories?: number;
   startTime?: Date; // start time of the activity
+  name?: string; // ADDED: Name of the track or route
   trackPoints: Array<{
     lat: number;
     lon: number;
@@ -98,6 +99,20 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
       });
     }
     console.log('Parsed trackPoints:', trackPoints); // Add this line
+
+    let trackName: string | undefined;
+    // Extract track name
+    const trkNameMatch = fileContent.match(/<trk>[\s\S]*?<name>([^<]+)<\/name>[\s\S]*?<\/trk>/);
+    if (trkNameMatch) {
+      trackName = trkNameMatch[1];
+    } else {
+      // If no track name, try looking for a route name
+      const rteNameMatch = fileContent.match(/<rte>[\s\S]*?<name>([^<]+)<\/name>[\s\S]*?<\/rte>/);
+      if (rteNameMatch) {
+        trackName = rteNameMatch[1];
+      }
+    }
+
     // Calculate distance using Haversine formula
     for (let i = 1; i < trackPoints.length; i++) {
       const prevPoint = trackPoints[i - 1];
@@ -169,6 +184,7 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
 
 
     return {
+      name: trackName, // ADDED: Include the extracted name
       distance: totalDistance > 0 ? totalDistance : undefined,
       duration,
       movingTime: movingTime > 0 ? Math.floor(movingTime) : undefined,

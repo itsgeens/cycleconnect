@@ -48,6 +48,7 @@ export const follows = pgTable("follows", {
 export const soloActivities = pgTable("solo_activities", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
+  rideId: integer("ride_id").references(() => rides.id), // ADDED: nullable rideId
   name: text("name").notNull(),
   description: text("description"),
   activityType: text("activity_type").notNull(), // cycling, running, etc.
@@ -277,6 +278,9 @@ export const insertSoloActivitySchema = createInsertSchema(soloActivities).pick(
   deviceType: true,
   completedAt: true,
   xpEarned: true,
+  xpDistance: true,
+  xpElevation: true,
+  xpSpeed: true,
 }).extend({
   activityType: z.enum(["cycling", "running", "walking", "other"]),
   deviceType: z.enum(["cycling_computer", "smartwatch", "phone", "manual"]).optional(),
@@ -327,9 +331,18 @@ export const activityMatches = pgTable("activity_matches", {
   xpElevation: integer("xp_elevation").default(0), // Added XP from elevation
   xpSpeed: integer("xp_speed").default(0), // Added XP from speed
   xpOrganizingBonus: integer("xp_organizing_bonus").default(0), // Added organizing bonus XP")
+  organizerGpxId: integer("organizer_gpx_id").references(() => organizerGpxFiles.id), // nullable
+  proximityScore: decimal("proximity_score", { precision: 5, scale: 2 }), // nullable
+  matchedPoints: integer("matched_points"), // nullable
+  totalOrganizerPoints: integer("total_organizer_points"), // nullable
+  isCompleted: boolean("is_completed").default(false), // nullable, default false
+  isPendingProximityMatch: boolean("is_pending_proximity_match").default(true), // nullable, default true
+  soloActivityId: integer("solo_activity_id").references(() => soloActivities.id), // nullable
+  isRetroactivelyMatched: boolean("is_retroactively_matched").default(false), // nullable, default false
+  isMatchFailed: boolean("is_match_failed").default(false), // nullable, default false
 }, (table) => ({
   uniqueUserRide: unique().on(table.rideId, table.userId),
-  uniqueUserDevice: unique().on(table.userId, table.deviceId),
+  //uniqueUserDevice: unique().on(table.userId, table.deviceId),
 }));
 
 // Zod schemas for device connections
@@ -338,9 +351,42 @@ export const insertDeviceConnectionSchema = createInsertSchema(deviceConnections
   createdAt: true,
 });
 
-export const insertActivityMatchSchema = createInsertSchema(activityMatches).omit({
-  id: true,
-  matchedAt: true,
+//export const insertActivityMatchSchema = createInsertSchema(activityMatches).omit({
+  //id: true,
+  //matchedAt: true,
+// });
+
+// Manually define insertActivityMatchSchema to match expected input
+export const insertActivityMatchSchema = z.object({
+  rideId: z.number(),
+  userId: z.number(),
+  deviceId: z.string(),
+  // Expect routeMatchPercentage and proximityScore as strings (matching schema)
+  routeMatchPercentage: z.string(),
+  proximityScore: z.string().nullable().optional(), // Allow null/undefined if not always present on insert
+  gpxFilePath: z.string(),
+  distance: z.string().nullable().optional(),
+  duration: z.number().nullable().optional(),
+  movingTime: z.number().nullable().optional(),
+  elevationGain: z.string().nullable().optional(),
+  averageSpeed: z.string().nullable().optional(),
+  averageHeartRate: z.number().nullable().optional(),
+  maxHeartRate: z.number().nullable().optional(),
+  calories: z.number().nullable().optional(),
+  completedAt: z.date(), // Expect a Date object
+  xpEarned: z.number().optional(),
+  xpDistance: z.number().optional(),
+  xpElevation: z.number().optional(),
+  xpSpeed: z.number().optional(),
+  xpOrganizingBonus: z.number().optional(),
+  organizerGpxId: z.number().nullable().optional(),
+  matchedPoints: z.number().nullable().optional(),
+  totalOrganizerPoints: z.number().nullable().optional(),
+  isCompleted: z.boolean().optional(),
+  isPendingProximityMatch: z.boolean().optional(),
+  soloActivityId: z.number().nullable().optional(),
+  isRetroactivelyMatched: z.boolean().optional(),
+  isMatchFailed: z.boolean().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -353,5 +399,11 @@ export type RideParticipant = typeof rideParticipants.$inferSelect;
 export type Follow = typeof follows.$inferSelect;
 export type DeviceConnection = typeof deviceConnections.$inferSelect;
 export type InsertDeviceConnection = z.infer<typeof insertDeviceConnectionSchema>;
+
+// Keep the inferred type for database selection
 export type ActivityMatch = typeof activityMatches.$inferSelect;
+// Use the manually defined Zod schema for insertion type
 export type InsertActivityMatch = z.infer<typeof insertActivityMatchSchema>;
+
+// export type ActivityMatch = typeof activityMatches.$inferSelect; 
+// export type InsertActivityMatch = z.infer<typeof insertActivityMatchSchema>;

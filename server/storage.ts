@@ -115,6 +115,26 @@ export interface IStorage {
     gpxFilePath: string;
     activityDate: Date;
   }>>;
+  // ADDED: Activity matching operations
+  createActivityMatch(match: InsertActivityMatch): Promise<ActivityMatch>;
+  getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
+  getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
+  getUserActivityForRide(rideId: number, userId: number): Promise<ActivityMatch | undefined>;
+  getPendingActivityMatchesForRide(rideId: number): Promise<ActivityMatch[]>; // ADDED
+  updateActivityMatch(id: number, updates: Partial<ActivityMatch>): Promise<void>; // ADDED
+  
+  // ADDED: Solo activities operations
+  createSoloActivity(activity: InsertSoloActivity): Promise<SoloActivity>;
+  getSoloActivity(id: number): Promise<SoloActivity | undefined>;
+  deleteSoloActivity(id: number): Promise<void>;
+  getUserSoloActivities(userId: number): Promise<SoloActivity[]>;
+  updateSoloActivity(id: number, updates: Partial<SoloActivity>): Promise<void>; // ADDED
+  getUserCompletedActivities(userId: number): Promise<{
+  completedRides: Array<Ride & { organizerName: string; participantCount: number; userActivityData?: ActivityMatch }>;
+  soloActivities: SoloActivity[];
+
+
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -767,8 +787,8 @@ export class DatabaseStorage implements IStorage {
       console.log(`[completeRide] Ride ${rideId} marked as completed.`);
   } else {
       console.log(`[completeRide] Ride ${rideId} was already completed. Skipping update.`);
+    }
   }
-}
 
   async getUserStats(userId: number, timeframe: string): Promise<{
     ridesJoined: number;
@@ -1835,6 +1855,61 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
       
     console.log(`Decremented user ${userId} XP by ${amount}.`);
+  }
+  async getPendingActivityMatchesForRide(rideId: number): Promise<ActivityMatch[]> {
+    console.log(`[storage] Fetching pending activity matches for ride ${rideId}`);
+    try {
+      // You'll need to import the activityMatches schema if not already imported
+      // import { activityMatches } from "@shared/schema";
+      // import { eq, and } from "drizzle-orm";
+
+      const pendingMatches = await db
+        .select()
+        .from(activityMatches)
+        .where(and(eq(activityMatches.rideId, rideId), eq(activityMatches.isPendingProximityMatch, true)));
+
+      console.log(`[storage] Found ${pendingMatches.length} pending activity matches for ride ${rideId}.`);
+      return pendingMatches;
+    } catch (error) {
+      console.error(`[storage] Error fetching pending activity matches for ride ${rideId}:`, error);
+      throw error; // Re-throw the error
+    }
+  }
+
+  async updateActivityMatch(id: number, updates: Partial<ActivityMatch>): Promise<void> {
+    console.log(`[storage] Updating activity match ${id} with data:`, updates);
+    try {
+      // You'll need to import the activityMatches schema if not already imported
+      // import { activityMatches } from "@shared/schema";
+      // import { eq } from "drizzle-orm";
+
+      await db
+        .update(activityMatches)
+        .set(updates)
+        .where(eq(activityMatches.id, id));
+      console.log(`[storage] Activity match ${id} updated.`);
+    } catch (error) {
+      console.error(`[storage] Error updating activity match ${id}:`, error);
+      throw error; // Re-throw the error
+    }
+  }
+
+  async updateSoloActivity(id: number, updates: Partial<SoloActivity>): Promise<void> {
+    console.log(`[storage] Updating solo activity ${id} with data:`, updates);
+    try {
+      // You'll need to import the soloActivities schema if not already imported
+      // import { soloActivities } from "@shared/schema";
+      // import { eq } from "drizzle-orm";
+
+      await db
+        .update(soloActivities)
+        .set(updates)
+        .where(eq(soloActivities.id, id));
+      console.log(`[storage] Solo activity ${id} updated.`);
+    } catch (error) {
+      console.error(`[storage] Error updating solo activity ${id}:`, error);
+      throw error; // Re-throw the error
+    }
   }
 }
 

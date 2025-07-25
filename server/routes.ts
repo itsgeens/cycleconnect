@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -91,76 +91,76 @@ class SupabaseStorage implements StorageEngine {
           return callback(error);
         }
         callback(null!);
-      })
-      .catch((err) => {
-        console.error('Supabase delete promise error:', err);
-        callback(err);
-      });
-  }
-}
-
-const supabaseStorage = new SupabaseStorage();
-
-const upload = multer({
-  storage: supabaseStorage, // Use the custom Supabase storage engine
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/gpx+xml' || file.originalname.endsWith('.gpx')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only GPX files are allowed'));
+        })
+        .catch((err) => {
+          console.error('Supabase delete promise error:', err);
+          callback(err);
+        });
     }
-  },
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-  },
-});
-
-
-// Initialize services
-const proximityMatcher = new GPXProximityMatcher();
-
-// Process participant proximity matching
-async function processParticipantMatching(rideId: number, organizerGpxId: number, organizerGpxPath: string) {
-  try {
-    console.log(`Processing participant proximity matching for ride ${rideId}`);
-    // This would analyze participant GPX files against organizer's actual route
-    // Implementation depends on specific requirements for retroactive matching
-  } catch (error) {
-    console.error('Error processing participant matching:', error);
   }
-}
 
-// Simple session management
-const sessions = new Map<string, { userId: number; expires: Date }>();
+  const supabaseStorage = new SupabaseStorage();
 
-function generateSessionId(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
+  const upload = multer({
+    storage: supabaseStorage, // Use the custom Supabase storage engine
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/gpx+xml' || file.originalname.endsWith('.gpx')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only GPX files are allowed'));
+      }
+    },
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+  });
 
-function cleanupExpiredSessions() {
-  const now = new Date();
-  for (const [sessionId, session] of Array.from(sessions.entries())) {
-    if (session.expires < now) {
+
+  // Initialize services
+  const proximityMatcher = new GPXProximityMatcher();
+
+  // Process participant proximity matching
+  async function processParticipantMatching(rideId: number, organizerGpxId: number, organizerGpxPath: string) {
+    try {
+      console.log(`Processing participant proximity matching for ride ${rideId}`);
+      // This would analyze participant GPX files against organizer's actual route
+      // Implementation depends on specific requirements for retroactive matching
+    } catch (error) {
+      console.error('Error processing participant matching:', error);
+    }
+  }
+
+  // Simple session management
+  const sessions = new Map<string, { userId: number; expires: Date }>();
+
+  function generateSessionId(): string {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
+
+  function cleanupExpiredSessions() {
+    const now = new Date();
+    for (const [sessionId, session] of Array.from(sessions.entries())) {
+      if (session.expires < now) {
+        sessions.delete(sessionId);
+      }
+    }
+  }
+
+  function requireAuth(req: any, res: any, next: any) {
+    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    if (!sessionId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session || session.expires < new Date()) {
       sessions.delete(sessionId);
+      return res.status(401).json({ message: "Session expired" });
     }
-  }
-}
 
-function requireAuth(req: any, res: any, next: any) {
-  const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId) {
-    return res.status(401).json({ message: "Authentication required" });
+    req.userId = session.userId;
+    next();
   }
-
-  const session = sessions.get(sessionId);
-  if (!session || session.expires < new Date()) {
-    sessions.delete(sessionId);
-    return res.status(401).json({ message: "Session expired" });
-  }
-
-  req.userId = session.userId;
-  next();
-}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Clean up expired sessions every hour
@@ -597,70 +597,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete ride with personal GPX data
-  app.post("/api/rides/:id/complete-with-data", requireAuth, upload.single("gpxFile"), async (req, res) => {
-    try {
-      const rideId = parseInt(req.params.id);
-      const userId = req.userId!;
-      
-      // Check if user is participant of the ride
-      const ride = await storage.getRide(rideId);
-      if (!ride) {
-        return res.status(404).json({ message: "Ride not found" });
-      }
-
-      const isParticipant = await storage.isUserJoined(rideId, userId);
-      if (!isParticipant) {
-        return res.status(403).json({ message: "Only participants can complete this ride with data" });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ message: "GPX file is required" });
-      }
-
-      // Parse GPX file to extract activity data
-      const gpxData = await parseGPXFile(req.file.path);
-      
-      // Store activity match data
-      await storage.createActivityMatch({
-        rideId,
-        userId,
-        deviceId: req.body.deviceId || 'manual',
-        routeMatchPercentage: '100.00', // Manually uploaded, assume 100% match
-        gpxFilePath: req.file.path,
-        distance: gpxData.distance?.toString(),
-        duration: gpxData.duration,
-        movingTime: gpxData.movingTime,
-        elevationGain: gpxData.elevationGain?.toString(),
-        averageSpeed: gpxData.averageSpeed?.toString(),
-        averageHeartRate: gpxData.averageHeartRate,
-        maxHeartRate: gpxData.maxHeartRate,
-        calories: gpxData.calories,
-        completedAt: new Date(),
-      });
-
-      res.json({ 
-        message: "Ride completed with personal data successfully",
-        activityData: {
-          distance: gpxData.distance,
-          duration: gpxData.duration,
-          movingTime: gpxData.movingTime,
-          elevationGain: gpxData.elevationGain,
-          averageSpeed: gpxData.averageSpeed,
-          averageHeartRate: gpxData.averageHeartRate,
-          maxHeartRate: gpxData.maxHeartRate,
-        }
-      });
-    } catch (error) {
-      console.error("Complete ride with data error:", error);
-      if (error instanceof Error) {
-        res.status(400).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    }
-  });
-
   // User rides routes
   app.get("/api/my-rides", requireAuth, async (req, res) => {
     try {
@@ -858,69 +794,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GPX upload route with activity matching
   app.post("/api/upload-activity", requireAuth, upload.single("gpx"), async (req, res) => {
-    console.log('--- Starting /api/upload-activity endpoint execution ---'); // Add this very first log
+    console.log('--- Starting /api/upload-activity endpoint execution ---');
     try {
       const userId = req.userId!;
       const file = req.file;
-      
+  
       if (!file) {
-        console.log('No GPX file provided'); 
+        console.log('No GPX file provided');
         return res.status(400).json({ message: "No GPX file provided" });
       }
-      console.log('GPX file provided:', file.originalname); // Log after the if condition
-      console.log('GPX file path:', file.path); // Log the file.path property
-      
+      console.log('GPX file provided:', file.originalname);
+      console.log('GPX file path:', file.path);
+  
       const { deviceName, deviceType, isOrganizerOverride } = req.body;
-      console.log('Request body:', req.body); // Log the request body
-
+      console.log('Request body:', req.body);
+  
       // Parse GPX file to extract activity data
-      console.log('Before calling parseGPXFile'); // Add this log
+      console.log('Before calling parseGPXFile');
       const gpxData = await parseGPXFile(file.path);
-      console.log('gpxData after parsing:', gpxData); // Add this log
-
+      console.log('gpxData after parsing:', gpxData);
+  
       // Validate GPX data has valid start time
       if (!gpxData.startTime || isNaN(gpxData.startTime.getTime())) {
-        console.log('Invalid GPX file: missing or malformed timestamp data'); // Log inside the if condition
+        console.log('Invalid GPX file: missing or malformed timestamp data');
         return res.status(400).json({ message: "Invalid GPX file: missing or malformed timestamp data" });
       }
-      console.log('GPX data validated'); // Log after validation
-
-      // Calculate XP breakdown from GPX data - ADDED
+      console.log('GPX data validated');
+  
+      // Calculate XP breakdown from GPX data
       const distance = gpxData.distance || 0;
       const elevationGain = gpxData.elevationGain || 0;
       const averageSpeed = gpxData.averageSpeed || 0;
-
+  
       const xpFromDistance = Math.round(distance * 0.05);
       const xpFromElevation = Math.round(elevationGain * 0.01);
-      const xpFromSpeed = Math.round(averageSpeed * 0.1); 
-
-      // Check if user has organized rides on the same date FIRST
-      const activityDate = new Date(gpxData.startTime as Date);
-      console.log('Activity date:', activityDate); // Log activity date
+      const xpFromSpeed = Math.round(averageSpeed * 0.1);
+  
+      // Check if user has organized rides on the same date
+      const activityDate = gpxData.startTime ? new Date(gpxData.startTime) : new Date(); // Provide a fallback date
+      console.log('Activity date:', activityDate);
       const plannedRides = await storage.getOrganizerPlannedRides(userId, activityDate);
       console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
-      
+  
       // If user has organized rides on this date, check for auto-match or prompt for manual override
       if (plannedRides.length > 0 && !isOrganizerOverride) {
         console.log(`User has ${plannedRides.length} organized rides on ${activityDate.toDateString()}`);
-        console.log('Attempting auto-match with organized rides'); // Log before auto-match
-        
+        console.log('Attempting auto-match with organized rides');
+  
         // Try auto-matching first
-        console.log('Before calling proximityMatcher.matchOrganizerGpx'); // Add this log
+        console.log('Before calling proximityMatcher.matchOrganizerGpx');
         const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
-        console.log('Calling proximityMatcher.matchOrganizerGpx with gpxData:', gpxData); // Add this log
-
+        console.log('Calling proximityMatcher.matchOrganizerGpx with gpxData:', gpxData);
+  
         if (autoMatch) {
           // Auto-match successful - process as organizer GPX
           console.log('Auto-match successful, creating organizer GPX record.');
-
-          // Calculate organizing bonus XP - ADDED
-          const organizingBonusXp = 1; // Example bonus XP for organizing
-
-           // Calculate total earned XP for organizer GPX - ADDED
+  
+          const organizingBonusXp = 1;
           const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed + organizingBonusXp;
-          const roundedEarnedXp = Math.round(earnedXp); // Round the total earned XP
-
+          const roundedEarnedXp = Math.round(earnedXp);
+  
           const organizerGpx = await storage.createOrganizerGpx({
             rideId: autoMatch.rideId,
             organizerId: userId,
@@ -943,20 +876,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             xpOrganizingBonus: organizingBonusXp,
           });
           console.log(`Organizer GPX record created with ID: ${organizerGpx.id}`);
-
-          // Mark ride as completed
+  
           console.log(`Calling storage.completeRide for ride ${autoMatch.rideId} triggered by organizer GPX upload.`);
-          await storage.completeRide(autoMatch.rideId, userId); // Pass userId as organizer
-          
-          // Increment the organizer's total XP - ADDED
+          await storage.completeRide(autoMatch.rideId, userId);
+  
           if (roundedEarnedXp > 0) {
             await storage.incrementUserXP(userId, roundedEarnedXp);
             console.log(`Added ${roundedEarnedXp} XP to organizer ${userId} for organizer GPX upload.`);
-         }
-          // Process participant proximity matching
-          console.log('Before calling processParticipantMatching after auto-match'); // Add this log
+          }
+  
+          console.log('Before calling processParticipantMatching after auto-match');
           await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
-          console.log('Calling processParticipantMatching after auto-match'); // Add this log
+          console.log('Calling processParticipantMatching after auto-match');
+  
           return res.json({
             type: 'organizer_auto_matched',
             message: `Automatically matched to your organized ride "${autoMatch.rideName}"`,
@@ -965,8 +897,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rideId: autoMatch.rideId
           });
         } else {
-          // No auto-match - prompt user for manual decision
-          console.log('No auto-match found, prompting for manual linking'); // Log before manual prompt
+          // No auto-match for organizer - prompt for manual decision
+          console.log('No auto-match found for organizer, prompting for manual linking');
           return res.json({
             type: 'organizer_manual_prompt',
             message: 'I noticed you organized a ride today. Would you like this GPX file to serve as the actual route for your planned ride?',
@@ -986,75 +918,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
-      // Try to match with existing joined rides within a reasonable time window
-      console.log('Before calling storage.getUserRides');
+  
+      // User is not an organizer or chose to override organizer flow
+      console.log('User is not an organizer or chose organizer override.');
+      console.log('Attempting to match with joined rides.');
+  
       const userRides = await storage.getUserRides(userId);
-      console.log('After calling storage.getUserRides, userRides:', userRides); 
-      
-      console.log('Before filtering userRides.joined, userRides.joined:', userRides?.joined);
-     
-      // Add a more robust check here
+      console.log('After calling storage.getUserRides, userRides:', userRides);
+  
       const joinedRides = (userRides && Array.isArray(userRides.joined)) ? userRides.joined : [];
-      console.log('After robust check, joinedRides:', joinedRides); // Add this log 
-     
-      const currentTime = new Date();
+      console.log('After robust check, joinedRides:', joinedRides);
+  
       const activityStartTime = new Date(gpxData.startTime);
-      
-      // Look for rides that are within 24 hours of the activity start time (before or after)
-      // and include completed rides that the user joined
       const timeWindowHours = 24;
       const timeWindowMs = timeWindowHours * 60 * 60 * 1000;
-      
+  
       const candidateRides = joinedRides.filter(ride => {
         const rideDateTime = new Date(ride.dateTime);
         const timeDiff = Math.abs(activityStartTime.getTime() - rideDateTime.getTime());
-        return timeDiff <= timeWindowMs; // Remove the isCompleted filter to include completed rides
+        // Also check if the ride is not completed yet or if it is completed by the organizer
+        return timeDiff <= timeWindowMs && (!ride.isCompleted || (ride.isCompleted && ride.organizerId === userId));
       });
-      console.log('After filtering joinedRides, candidateRides:', candidateRides); // Add this log
-
-      // Debug: Log available rides for matching
-      console.log('Available rides for matching:', candidateRides.map(r => ({
-        id: r.id,
-        name: r.name,
-        dateTime: r.dateTime,
-        isCompleted: r.isCompleted
-      })));
-      
-      console.log('Activity start time:', gpxData.startTime);
-      console.log('Activity track points:', gpxData.trackPoints?.length || 0);
-      
+      console.log('After filtering joinedRides for time window and completion status, candidateRides:', candidateRides);
+  
+  
       let bestMatch = null;
       let bestMatchScore = 0;
-      
-      // Simple route matching logic (can be enhanced)
+  
       for (const ride of candidateRides) {
         try {
-          // First try to parse the original planned route GPX
           let rideGpxData = null;
           try {
-            console.log(`Attempting to parse planned route GPX for ride ${ride.id}: ${ride.gpxFilePath}`); // Log before parsing planned route
+            console.log(`Attempting to parse planned route GPX for ride ${ride.id}: ${ride.gpxFilePath}`);
             rideGpxData = await parseGPXFile(ride.gpxFilePath);
-            console.log(`Successfully parsed planned route GPX for ride ${ride.id}`); // Log after successful parsing
+            console.log(`Successfully parsed planned route GPX for ride ${ride.id}`);
           } catch (plannedRouteError) {
-            console.warn(`Could not parse planned route GPX for ride ${ride.id}, trying organizer's actual GPX:`, plannedRouteError);
-            
-            // If planned route fails, try to get organizer's actual uploaded GPX
+            console.warn(`Could not parse planned route GPX for ride ${ride.id}, trying organizer\'s actual GPX:`, plannedRouteError);
+  
             const organizerGpx = await storage.getOrganizerGpxForRide(ride.id);
             if (organizerGpx) {
-              console.log(`Found organizer's actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`);
-                console.log(`Attempting to parse organizer's actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`); // Log before parsing organizer's GP
+              console.log(`Found organizer\'s actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`);
+              console.log(`Attempting to parse organizer\'s actual GPX for ride ${ride.id}: ${organizerGpx.gpxFilePath}`);
               rideGpxData = await parseGPXFile(organizerGpx.gpxFilePath);
-                console.log(`Successfully parsed organizer's actual GPX for ride ${ride.id}`); // Log after successful parsing
+              console.log(`Successfully parsed organizer\'s actual GPX for ride ${ride.id}`);
             }
           }
-          
+  
           if (rideGpxData) {
-            console.log('Calling calculateRouteMatch with gpxData and rideGpxData:', { gpxData, rideGpxData }); // Add this log
+            console.log('Calling calculateRouteMatch with gpxData and rideGpxData:', { gpxData, rideGpxData });
             const matchScore = calculateRouteMatch(gpxData, rideGpxData);
-            console.log('After calling calculateRouteMatch, matchScore:', matchScore); // Log after calculateRouteMatch
+            console.log('After calling calculateRouteMatch, matchScore:', matchScore);
             console.log(`Ride ${ride.name} match score: ${matchScore}`);
-            
+  
             if (matchScore > bestMatchScore && matchScore >= 0.5) {
               bestMatch = ride;
               bestMatchScore = matchScore;
@@ -1066,15 +981,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn(`Could not parse GPX for ride ${ride.id}:`, error);
         }
       }
-
+  
       if (bestMatch && bestMatchScore >= 0.5) {
-        console.log(`Match found for ride ${bestMatch.id} with score ${bestMatchScore}`); // Log when match is found
-        // Check if user already has activity data for this ride
+        console.log(`Match found for ride ${bestMatch.id} with score ${bestMatchScore}`);
         const existingActivity = await storage.getUserActivityForRide(bestMatch.id, userId);
-        
+  
         if (existingActivity) {
-          console.log(`Existing activity found for ride ${bestMatch.id}, updating`); // Log when existing activity is found
-          // User already has activity data for this ride, just update it
+          console.log(`Existing activity found for ride ${bestMatch.id}, updating`);
           res.json({
             message: "Activity updated for matched ride!",
             matchedRide: bestMatch,
@@ -1082,27 +995,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             existing: true,
           });
         } else {
-          console.log(`No existing activity found for ride ${bestMatch.id}, creating new activity match`); // Log when creating new activity match
-          
-           // Calculate total earned XP for participant activity match 
-           const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
-           const roundedEarnedXp = Math.round(earnedXp);
-          
-          
-          // Match found - complete the ride if not already completed 
+          console.log(`No existing activity found for ride ${bestMatch.id}, creating new activity match`);
+  
+          const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
+          const roundedEarnedXp = Math.round(earnedXp);
+  
+          // Check if the ride is already completed by the organizer. If so, no need to complete it again.
           if (!bestMatch.isCompleted) {
-              console.log(`Ride ${bestMatch.id} is not completed, marking as completed`); // Log before completing ride
-            await storage.completeRide(bestMatch.id, userId);
-            console.log(`Ride ${bestMatch.id} marked as completed`); // Log after completing ride
+              console.log(`Ride ${bestMatch.id} is not completed, marking as completed`);
+            await storage.completeRide(bestMatch.id, userId); // User who uploads activity marks ride as completed for themselves
+            console.log(`Ride ${bestMatch.id} marked as completed for user ${userId}`);
+          } else {
+               console.log(`Ride ${bestMatch.id} is already completed by the organizer.`);
           }
-          
-          // Create activity match record
-          console.log('Before creating activity match record'); // Log before creating activity match
+  
+  // In /api/link-participant-gpx endpoint, inside await storage.createActivityMatch({...})
+          console.log('Before creating activity match record');
           await storage.createActivityMatch({
             rideId: bestMatch.id,
             userId,
             deviceId: deviceName || 'manual-upload',
-            routeMatchPercentage: (bestMatchScore * 100).toFixed(2),
+            routeMatchPercentage: (bestMatchScore * 100).toFixed(2), // Use the calculated bestMatchScore
             gpxFilePath: file.path,
             distance: gpxData.distance?.toString() ?? null,
             duration: gpxData.duration ?? null,
@@ -1110,25 +1023,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             elevationGain: gpxData.elevationGain?.toString() ?? null,
             averageSpeed: gpxData.averageSpeed?.toString() ?? null,
             averageHeartRate: gpxData.averageHeartRate ?? null,
-            maxHeartRate: gpxData.maxHeartRate ?? null, 
+            maxHeartRate: gpxData.maxHeartRate ?? null,
             calories: gpxData.calories ?? null,
-            completedAt: new Date(),
+            completedAt: gpxData.startTime ? new Date(gpxData.startTime) : new Date(),
             xpEarned: roundedEarnedXp,
             xpDistance: xpFromDistance,
             xpElevation: xpFromElevation,
             xpSpeed: xpFromSpeed,
-            xpOrganizingBonus: 0, // Participant matches don't get organizing bonus
+            xpOrganizingBonus: 0,
           });
-          console.log('After creating activity match record'); // Log after creating activity match
-          
-           // Immediately increment the user's total XP for this matched activity. - ADDED
-           if (roundedEarnedXp > 0) {
+          console.log('After creating activity match record');
+  
+          if (roundedEarnedXp > 0) {
             await storage.incrementUserXP(userId, roundedEarnedXp);
             console.log(`Added ${roundedEarnedXp} XP to user ${userId} for activity match on ride ${bestMatch.id}.`);
           }
-
-          // Note: storage.completeRide is NOT called here. Ride completion is an organizer action.
-
+  
           res.json({
             message: "Activity matched!",
             matchedRide: bestMatch,
@@ -1136,66 +1046,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else {
-        // No match found - create a solo activity automatically
-        console.log('No ride match found, creating solo activity with gpxData:', gpxData); // Add this log
-        
-         // Add a check for req.file here
-         if (!req.file) {
-          console.error('Error creating solo activity: req.file is undefined'); // Log the error
-          // Decide how to handle this case:
-          // - Return an error response to the client
-          // - Throw an error to be caught by the outer catch block
-          return res.status(500).json({ message: "Error processing uploaded file for solo activity" });
-         }
-        
-         // Reuse the XP breakdown calculated earlier for solo activities
-        const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed; // Calculate total XP for solo activity
-        const roundedEarnedXp = Math.round(earnedXp);
-
-        const soloActivity = await storage.createSoloActivity({
-          name: `Manual Activity - ${new Date().toLocaleDateString()}`,
-          description: `Solo cycling activity uploaded manually`,
-          activityType: 'cycling',
-          gpxFilePath: req.file.path,
-          distance: gpxData.distance?.toString(),
-          duration: gpxData.duration,
-          movingTime: gpxData.movingTime,
-          elevationGain: gpxData.elevationGain?.toString(),
-          averageSpeed: gpxData.averageSpeed?.toString(),
-          averageHeartRate: gpxData.averageHeartRate,
-          maxHeartRate: gpxData.maxHeartRate,
-          calories: gpxData.calories,
-          deviceName: deviceName || 'Manual Upload',
-          deviceType: deviceType || 'manual',
-          completedAt: new Date(),
-          userId,
-          xpEarned: roundedEarnedXp,
-          xpDistance: xpFromDistance,
-          xpElevation: xpFromElevation,
-          xpSpeed: xpFromSpeed,
-          // No organizing bonus for solo activities
-          xpOrganizingBonus: 0, // Ensure this is included and 0
+        // No automatic match found with joined rides
+        console.log('No automatic match found with joined rides.');
+        const joinedRidesOnActivityDate = joinedRides.filter(ride => {
+            const rideDateTime = new Date(ride.dateTime);
+            return rideDateTime.toDateString() === activityDate.toDateString();
         });
-          console.log('Solo activity created:', soloActivity); // Log created solo activity
-        
-          // Increment user's total XP for the solo activity - ADDED
-        if (roundedEarnedXp > 0) {
-          await storage.incrementUserXP(userId, roundedEarnedXp);
-          console.log(`Solo activity created, XP increment handled within createSoloActivity.`); // Temporary log
+  
+        if (joinedRidesOnActivityDate.length > 0) {
+            // User has joined rides on this day, prompt for manual linking
+            console.log(`User has ${joinedRidesOnActivityDate.length} joined rides on ${activityDate.toDateString()}. Prompting for manual linking.`);
+            return res.json({
+                type: 'participant_manual_prompt',
+                message: 'I noticed you joined a ride today. Would you like to link this activity to one of your joined rides?',
+                gpxData: {
+                  distance: gpxData.distance,
+                  duration: gpxData.duration,
+                  movingTime: gpxData.movingTime,
+                  elevationGain: gpxData.elevationGain
+                },
+                joinedRides: joinedRidesOnActivityDate.map(ride => ({
+                  id: ride.id,
+                  name: ride.name,
+                  dateTime: ride.dateTime,
+                  description: ride.description
+                })),
+                tempFilePath: file.path
+            });
+        } else {
+            // No joined rides on this day either, create a solo activity automatically
+            console.log('No joined rides on activity date, creating solo activity.');
+            if (!req.file) {
+                console.error('Error creating solo activity: req.file is undefined');
+                return res.status(500).json({ message: "Error processing uploaded file for solo activity" });
+            }
+  
+            const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
+            const roundedEarnedXp = Math.round(earnedXp);
+  
+            const soloActivity = await storage.createSoloActivity({
+                name: `Manual Activity - ${new Date().toLocaleDateString()}`,
+                description: `Solo cycling activity uploaded manually`,
+                activityType: 'cycling',
+                gpxFilePath: req.file.path,
+                distance: gpxData.distance?.toString(),
+                duration: gpxData.duration,
+                movingTime: gpxData.movingTime,
+                elevationGain: gpxData.elevationGain?.toString(),
+                averageSpeed: gpxData.averageSpeed?.toString(),
+                averageHeartRate: gpxData.averageHeartRate,
+                maxHeartRate: gpxData.maxHeartRate,
+                calories: gpxData.calories,
+                deviceName: deviceName || 'Manual Upload',
+                deviceType: deviceType || 'manual',
+                completedAt: new Date(),
+                userId,
+                xpEarned: roundedEarnedXp,
+                xpDistance: xpFromDistance,
+                xpElevation: xpFromElevation,
+                xpSpeed: xpFromSpeed,
+            });
+            console.log('Solo activity created:', soloActivity);
+  
+            if (roundedEarnedXp > 0) {
+                await storage.incrementUserXP(userId, roundedEarnedXp);
+                console.log(`Solo activity created, XP increment handled within createSoloActivity.`);
+            }
+  
+            res.json({
+                message: "Solo activity created successfully",
+                matchedRide: null,
+                soloActivity,
+                matches: 0, // No matches found
+            });
         }
-
-        res.json({
-          message: "Solo activity created successfully", 
-          matchedRide: null,
-          soloActivity,
-          matches: candidateRides.length,
-        });
       }
     } catch (error) {
       console.error("Upload activity error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
+  
+  // New endpoint for manual participant GPX linking
+  app.post("/api/link-participant-gpx", requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { rideId, tempFilePath, gpxData } = req.body;
+  
+      console.log('Link participant GPX request body:', req.body);
+      console.log('Request data:', { rideId, tempFilePath, gpxData });
+  
+      if (!rideId || !tempFilePath || !gpxData) {
+        console.log('Missing fields for participant link:', { rideId: !!rideId, tempFilePath: !!tempFilePath, gpxData: !!gpxData });
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+  
+      // Verify user is a participant of this ride
+      const isParticipant = await storage.isUserJoined(rideId, userId);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized - you are not a participant of this ride" });
+      }
+  
+      // Check if user already has activity data for this ride
+      const existingActivity = await storage.getUserActivityForRide(rideId, userId);
+      if (existingActivity) {
+        console.log(`Existing activity found for ride ${rideId}, cannot link again.`);
+        return res.status(400).json({ message: "You have already linked an activity to this ride." });
+      }
+  
+      // At this point, we don't have a matchScore from an automatic matching process.
+      // If you want to calculate a matchScore here based on the selected ride's GPX,
+      // you would fetch the organizer's GPX for this ride and run calculateRouteMatch.
+      // For simplicity in this step, I'll set a placeholder score or assume 100% if it's a manual link.
+      // Let's assume 100% match for manual linking for now, or you can implement the comparison here.
+      let matchScore = "100.00"; // Placeholder
+  
+      // If you want to calculate the match score here:
+      try {
+          const organizerGpx = await storage.getOrganizerGpxForRide(rideId);
+          if (organizerGpx) {
+               const organizerGpxData = await parseGPXFile(organizerGpx.gpxFilePath);
+               if (organizerGpxData) {
+                   const calculatedScore = calculateRouteMatch(gpxData, organizerGpxData);
+                   matchScore = (calculatedScore * 100).toFixed(2);
+                   console.log(`Calculated match score for manual participant link: ${matchScore}`);
+               }
+          } else {
+               console.warn(`Organizer GPX not found for ride ${rideId}, cannot calculate precise match score for manual link.`);
+          }
+      } catch (matchError) {
+          console.error('Error calculating match score for manual participant link:', matchError);
+          // Continue with placeholder score
+      }
+  
+  
+      // Create activity match record
+      console.log('Before creating activity match record for participant manual link');
+      const earnedXp = Math.round((gpxData.distance || 0) * 0.05 + (gpxData.elevationGain || 0) * 0.01 + (gpxData.averageSpeed || 0) * 0.1);
+  
+  
+      await storage.createActivityMatch({
+        rideId,
+        userId,
+        deviceId: gpxData.deviceName || 'manual-upload', // Assuming deviceName might be in gpxData, fallback to manual
+        routeMatchPercentage: matchScore,
+        gpxFilePath: tempFilePath,
+        distance: gpxData.distance?.toString() ?? null,
+        duration: gpxData.duration ?? null,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString() ?? null,
+        averageSpeed: gpxData.averageSpeed?.toString() ?? null,
+        averageHeartRate: gpxData.averageHeartRate ?? null,
+        maxHeartRate: gpxData.maxHeartRate ?? null,
+        calories: gpxData.calories ?? null,
+        completedAt: new Date(),
+        xpEarned: earnedXp,
+        xpDistance: Math.round((gpxData.distance || 0) * 0.05),
+        xpElevation: Math.round((gpxData.elevationGain || 0) * 0.01),
+        xpSpeed: Math.round((gpxData.averageSpeed || 0) * 0.1),
+        xpOrganizingBonus: 0,
+      });
+      console.log('After creating activity match record for participant manual link');
+  
+       // Immediately increment the user's total XP for this manually linked activity. - ADDED
+       if (earnedXp > 0) {
+          await storage.incrementUserXP(userId, earnedXp);
+          console.log(`Added ${earnedXp} XP to user ${userId} for manually linked activity on ride ${rideId}.`);
+      }
+  
+  
+      // You might want to re-fetch the ride details to send updated info back to the client
+      const updatedRide = await storage.getRide(rideId);
+  
+  
+      res.json({
+        type: 'participant_manual_linked',
+        message: `Successfully linked activity to joined ride "${updatedRide?.name}"`,
+        linkedRide: {
+            id: updatedRide?.id,
+            name: updatedRide?.name,
+            // include other relevant ride details you need on the frontend
+        },
+        matchScore: parseFloat(matchScore),
+        activityData: { // Include activity data in the response
+            distance: gpxData.distance,
+            duration: gpxData.duration,
+            movingTime: gpxData.movingTime,
+            elevationGain: gpxData.elevationGain,
+            averageSpeed: gpxData.averageSpeed,
+            averageHeartRate: gpxData.averageHeartRate,
+            maxHeartRate: gpxData.maxHeartRate,
+        }
+      });
+  
+    } catch (error) {
+      console.error("Link participant GPX error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
 
   // Manual organizer GPX linking - when user chooses to link their GPX to an organized ride
   app.post("/api/link-organizer-gpx", requireAuth, async (req, res) => {
@@ -1276,20 +1325,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not authorized to delete this activity' });
       }
 
-// Delete the GPX file from Supabase if it exists
-if (activity.gpxFilePath) {
-  try {
-    const { data, error } = await supabase.storage
-      .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
-      .remove([activity.gpxFilePath]); // activity.gpxFilePath should already be the Supabase path
+  // Delete the GPX file from Supabase if it exists
+  if (activity.gpxFilePath) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('gpx-uploads') // Replace 'gpx-uploads' with your Supabase bucket name
+        .remove([activity.gpxFilePath]); // activity.gpxFilePath should already be the Supabase path
 
-    if (error) {
-      console.warn('Could not delete GPX file from Supabase:', error);
+      if (error) {
+        console.warn('Could not delete GPX file from Supabase:', error);
+      }
+    } catch (fileError) {
+      console.warn('Supabase delete promise error:', fileError);
     }
-  } catch (fileError) {
-    console.warn('Supabase delete promise error:', fileError);
   }
-}
 
 
       // Delete the activity from database
@@ -1305,189 +1354,413 @@ if (activity.gpxFilePath) {
   // Initialize proximity matcher
   const proximityMatcher = new GPXProximityMatcher();
 
-  // Upload organizer GPX for planned ride
-  app.post("/api/organizer-gpx", requireAuth, upload.single("gpx"), async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const file = req.file;
-      
-      if (!file) {
-        return res.status(400).json({ message: "No GPX file provided" });
-      }
+// Upload organizer GPX for planned ride
+app.post("/api/organizer-gpx", requireAuth, upload.single("gpx"), async (req, res) => {
+  console.log('--- Starting /api/organizer-gpx endpoint execution ---');
+  try {
+    const userId = req.userId!;
+    const file = req.file;
 
-      // Parse GPX file to extract activity data
-      const gpxData = await parseGPXFile(file.path);
-      
-      // Get organizer's planned rides on the same date
-      const activityDate = new Date(gpxData.startTime);
-      const plannedRides = await storage.getOrganizerPlannedRides(userId, activityDate);
-      
-      console.log(`Checking ${plannedRides.length} planned rides for auto-matching`);
-      
-      // Try to auto-match with planned rides (70% similarity threshold)
-      const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
-      
-      if (autoMatch) {
-        // Auto-match found - link directly
-        const organizerGpx = await storage.createOrganizerGpx({
-          rideId: autoMatch.rideId,
-          organizerId: userId,
-          gpxFilePath: file.path,
-          originalGpxPath: plannedRides.find(r => r.id === autoMatch.rideId)?.gpxFilePath,
-          matchScore: autoMatch.matchScore.toString(),
-          isManuallyLinked: false,
-          distance: gpxData.distance?.toString(),
-          duration: gpxData.duration,
-          movingTime: gpxData.movingTime,
-          elevationGain: gpxData.elevationGain?.toString(),
-          averageSpeed: gpxData.averageSpeed?.toString(),
-          averageHeartRate: gpxData.averageHeartRate,
-          maxHeartRate: gpxData.maxHeartRate,
-          calories: gpxData.calories,
-        });
-
-        // Mark ride as completed
-        await storage.completeRide(autoMatch.rideId, userId);
-        
-        // Process participant proximity matching
-        await processParticipantMatching(autoMatch.rideId, organizerGpx.id, file.path);
-        console.log('Calling processParticipantMatching after auto-match'); // Add this log
-        res.json({
-          message: `Auto-matched to ride "${autoMatch.rideName}" with ${autoMatch.matchScore.toFixed(1)}% similarity`,
-          organizerGpx,
-          autoMatched: true,
-          matchScore: autoMatch.matchScore,
-          rideName: autoMatch.rideName,
-        });
-      } else {
-        // No auto-match - create unlinked GPX for manual selection
-        const organizerGpx = await storage.createOrganizerGpx({
-          rideId: -1, // Temporary - will be set when manually linked
-          organizerId: userId,
-          gpxFilePath: file.path,
-          matchScore: "0.00",
-          isManuallyLinked: false,
-          distance: gpxData.distance?.toString(),
-          duration: gpxData.duration,
-          movingTime: gpxData.movingTime,
-          elevationGain: gpxData.elevationGain?.toString(),
-          averageSpeed: gpxData.averageSpeed?.toString(),
-          averageHeartRate: gpxData.averageHeartRate,
-          maxHeartRate: gpxData.maxHeartRate,
-          calories: gpxData.calories,
-        });
-
-        res.json({
-          message: "No automatic match found. Please manually link to a planned ride.",
-          organizerGpx,
-          autoMatched: false,
-          availableRides: plannedRides,
-        });
-      }
-    } catch (error) {
-      console.error('Organizer GPX upload error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+    if (!file) {
+      console.log('No GPX file provided');
+      return res.status(400).json({ message: "No GPX file provided" });
     }
-  });
+    console.log('GPX file provided:', file.originalname);
+    console.log('GPX file path:', file.path);
 
-  // Manual link organizer GPX to planned ride
-  app.post("/api/rides/:rideId/link-gpx", requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId!;
-      const rideId = parseInt(req.params.rideId);
-      const { gpxId } = linkGpxSchema.parse(req.body);
-      
-      // Verify user is the organizer
-      const ride = await storage.getRide(rideId);
-      if (!ride || ride.organizerId !== userId) {
-        return res.status(403).json({ message: "Not authorized to link GPX to this ride" });
-      }
-      
-      // Verify GPX file belongs to user
-      const gpxFile = await storage.getOrganizerGpxById(parseInt(gpxId));
-      if (!gpxFile || gpxFile.organizerId !== userId) {
-        return res.status(403).json({ message: "GPX file not found or not owned by user" });
-      }
-      
-      // Link the GPX file to the ride
-      await storage.linkOrganizerGpx(rideId, parseInt(gpxId), true);
-      
-      // Mark ride as completed
-      await storage.completeRide(rideId, userId);
-      
-      // Process participant proximity matching
-      await processParticipantMatching(rideId, parseInt(gpxId), gpxFile.gpxFilePath);
-      
-      res.json({ message: "GPX file successfully linked to ride" });
-    } catch (error) {
-      console.error('Manual GPX link error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  });
+    // Parse GPX file to extract activity data
+    console.log('Before calling parseGPXFile for organizer GPX');
+    const gpxData = await parseGPXFile(file.path);
+    console.log('gpxData after parsing organizer GPX:', gpxData);
 
-  // Get participant matches for a ride
-  app.get("/api/rides/:rideId/participant-matches", requireAuth, async (req, res) => {
-    try {
-      const rideId = parseInt(req.params.rideId);
-      const matches = await storage.getParticipantMatches(rideId);
-      res.json({ matches });
-    } catch (error) {
-      console.error('Get participant matches error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  });
+    // Get organizer's planned rides on the same date
+    const activityDate = new Date(gpxData.startTime ?? new Date()); // Use nullish coalescing to provide a fallback Date
+    const plannedRides = await storage.getOrganizerPlannedRides(userId, activityDate);
 
-  // Helper function to process participant proximity matching
-  async function processParticipantMatching(rideId: number, organizerGpxId: number, organizerGpxPath: string) {
-    try {
-      // Get all participants for this ride
-      const participantIds = await storage.getRideParticipantIds(rideId);
-      
-      if (participantIds.length === 0) {
-        console.log('No participants to match for ride', rideId);
-        return;
-      }
-      
-      // Get any pending participant GPX files that might match
-      const pendingGpxFiles = await storage.getPendingParticipantGpxFiles(rideId, participantIds);
-      
-      console.log(`Processing ${pendingGpxFiles.length} pending participant GPX files for ride ${rideId}`);
-      
-      // Check proximity for each participant GPX
-      for (const participantGpx of pendingGpxFiles) {
-        try {
-          const proximityResult = await proximityMatcher.checkParticipantProximity(
-            organizerGpxPath,
-            participantGpx.gpxFilePath
-          );
-          
-          // Create participant match record
-          await storage.createParticipantMatch({
-            rideId,
-            participantId: participantGpx.userId,
-            organizerGpxId,
-            participantGpxPath: participantGpx.gpxFilePath,
-            proximityScore: proximityResult.proximityScore.toString(),
-            matchedPoints: proximityResult.matchedPoints,
-            totalOrganizerPoints: proximityResult.totalOrganizerPoints,
-            isCompleted: proximityResult.isCompleted,
-            // Extract additional metrics from participant GPX
-            distance: "0", // Will be populated by GPX parse
-            duration: 0,
-            movingTime: 0,
-            elevationGain: "0",
-            averageSpeed: "0",
-          });
-          
-          console.log(`Participant ${participantGpx.userId} proximity: ${proximityResult.proximityScore.toFixed(1)}% (${proximityResult.isCompleted ? 'COMPLETED' : 'incomplete'})`);
-        } catch (error) {
-          console.warn(`Error processing participant ${participantGpx.userId} GPX:`, error);
-        }
-      }
-    } catch (error) {
-      console.error('Participant matching error:', error);
+    console.log(`Checking ${plannedRides.length} planned rides for auto-matching organizer GPX`);
+
+    // Try to auto-match with planned rides (70% similarity threshold)
+    console.log('Before calling proximityMatcher.matchOrganizerGpx for organizer auto-match');
+    const autoMatch = await proximityMatcher.matchOrganizerGpx(gpxData, plannedRides);
+    console.log('After calling proximityMatcher.matchOrganizerGpx for organizer auto-match, autoMatch:', autoMatch);
+
+    if (autoMatch) {
+      // Auto-match found - link directly
+      console.log('Organizer auto-match successful, creating organizer GPX record.');
+
+      const organizerGpx = await storage.createOrganizerGpx({
+        rideId: autoMatch.rideId,
+        organizerId: userId,
+        gpxFilePath: file.path,
+        originalGpxPath: plannedRides.find(r => r.id === autoMatch.rideId)?.gpxFilePath,
+        matchScore: autoMatch.matchScore.toString(),
+        isManuallyLinked: false,
+        distance: gpxData.distance?.toString(),
+        duration: gpxData.duration,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString(),
+        averageSpeed: gpxData.averageSpeed?.toString(),
+        averageHeartRate: gpxData.averageHeartRate,
+        maxHeartRate: gpxData.maxHeartRate,
+        calories: gpxData.calories,
+        // XP for organizer's activity will be calculated and added when completing the ride
+      });
+      console.log(`Organizer GPX record created with ID: ${organizerGpx.id} for ride ${autoMatch.rideId}`);
+
+      // Mark ride as completed by the organizer
+      console.log(`Calling storage.completeRide for ride ${autoMatch.rideId} triggered by organizer GPX upload.`);
+      await storage.completeRide(autoMatch.rideId, userId); // Pass userId as organizer
+      console.log(`Ride ${autoMatch.rideId} marked as completed by organizer ${userId}.`);
+
+      // --- Retroactive Matching for Participants ---
+      console.log(`Starting retroactive matching for pending participant activities for ride ${autoMatch.rideId}.`);
+      await processPendingParticipantMatchesForRide(autoMatch.rideId, organizerGpx.id, file.path);
+      console.log(`Finished retroactive matching for ride ${autoMatch.rideId}.`);
+      // --- End Retroactive Matching ---
+
+
+      res.json({
+        type: 'organizer_auto_matched',
+        message: `Automatically matched to your organized ride \"${autoMatch.rideName}\" with ${autoMatch.matchScore.toFixed(1)}% similarity`,
+        organizerGpx,
+        autoMatched: true,
+        matchScore: autoMatch.matchScore,
+        rideName: autoMatch.rideName,
+      });
+    } else {
+      // No auto-match - create unlinked GPX for manual selection by the organizer
+      console.log('No automatic match found for organizer GPX. Creating unlinked organizer GPX record.');
+      const organizerGpx = await storage.createOrganizerGpx({
+        rideId: -1, // Temporary - will be set when manually linked
+        organizerId: userId,
+        gpxFilePath: file.path,
+        matchScore: "0.00",
+        isManuallyLinked: false,
+        distance: gpxData.distance?.toString(),
+        duration: gpxData.duration,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString(),
+        averageSpeed: gpxData.averageSpeed?.toString(),
+        averageHeartRate: gpxData.averageHeartRate,
+        maxHeartRate: gpxData.maxHeartRate,
+        calories: gpxData.calories,
+         // XP is not calculated at this stage for unlinked organizer GPX
+      });
+      console.log(`Unlinked organizer GPX record created with ID: ${organizerGpx.id}`);
+
+      res.json({
+        message: "No automatic match found. Please manually link to a planned ride.",
+        organizerGpx,
+        autoMatched: false,
+        availableRides: plannedRides,
+      });
     }
+  } catch (error) {
+    console.error('Organizer GPX upload error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+
+// New helper function to process pending participant matches for a specific ride
+async function processPendingParticipantMatchesForRide(rideId: number, organizerGpxId: number, organizerGpxPath: string) {
+    console.log(`Processing pending participant matches for ride ${rideId}`);
+    try {
+        // Get all activity_match records for this ride that are pending proximity match
+        const pendingActivityMatches = await storage.getPendingActivityMatchesForRide(rideId);
+
+        console.log(`Found ${pendingActivityMatches.length} pending activity matches for ride ${rideId}.`);
+
+        for (const pendingMatch of pendingActivityMatches) {
+            try {
+                console.log(`Processing pending match for user ${pendingMatch.userId} with activity match ID ${pendingMatch.id}.`);
+                // Retrieve the participant's GPX data
+                 // We need to fetch the gpxData again from the stored path
+                 const participantGpxData = await parseGPXFile(pendingMatch.gpxFilePath);
+
+                 if (!participantGpxData || !participantGpxData.startTime || isNaN(participantGpxData.startTime.getTime())) {
+                     console.warn(`Could not parse participant GPX for pending match ${pendingMatch.id} or invalid data.`);
+                     // Optionally update the activity_match to reflect parsing failure
+                     // await storage.updateActivityMatch(pendingMatch.id, { isMatchFailed: true, isPendingProximityMatch: false });
+                     continue; // Skip this pending match
+                 }
+
+                // Perform the proximity match calculation
+                console.log(`Attempting proximity match for user ${pendingMatch.userId} using organizer GPX ${organizerGpxPath} and participant GPX ${pendingMatch.gpxFilePath}`);
+                const proximityResult = await proximityMatcher.checkParticipantProximity(
+                    organizerGpxPath, // Newly uploaded organizer's actual GPX
+                    pendingMatch.gpxFilePath // Participant's uploaded GPX
+                );
+                console.log(`Proximity match result for user ${pendingMatch.userId}: ${proximityResult.proximityScore.toFixed(1)}%`);
+
+
+                // Check if the match score is 50% or higher
+                const matchScore = proximityResult.proximityScore * 100; // Convert to percentage
+
+                if (matchScore >= 50) {
+                    console.log(`Match score ${matchScore.toFixed(2)}% >= 50% for user ${pendingMatch.userId}. Linking activity.`);
+                    // Update the activity_match record with match results
+                    await storage.updateActivityMatch(pendingMatch.id, {
+                        organizerGpxId: organizerGpxId, // Link to the organizer's GPX file
+                        routeMatchPercentage: matchScore.toFixed(2),
+                        proximityScore: proximityResult.proximityScore.toFixed(2),
+                        matchedPoints: proximityResult.matchedPoints,
+                        totalOrganizerPoints: proximityResult.totalOrganizerPoints,
+                        isCompleted: proximityResult.isCompleted, // Update completion status based on match
+                        isPendingProximityMatch: false, // No longer pending
+                        isRetroactivelyMatched: true, // Mark as retroactively matched
+                        isMatchFailed: false, // Ensure failed flag is false
+                    });
+                    console.log(`Activity match ${pendingMatch.id} updated and linked for user ${pendingMatch.userId}.`);
+
+                    // Update the corresponding solo activity to reflect it's now a matched ride activity
+                    if (pendingMatch.soloActivityId) {
+                         console.log(`Updating linked solo activity ${pendingMatch.soloActivityId} for user ${pendingMatch.userId}.`);
+                         await storage.updateSoloActivity(pendingMatch.soloActivityId, {
+                             name: `Matched Ride Activity: ${participantGpxData.name || 'Unnamed Activity'}`, // Adjust based on your GpxData structure
+                             description: `Activity matched to ride ${rideId}`, // Update description
+                             // Consider adding a rideId foreign key to solo_activities and updating it here
+                             // rideId: rideId,
+                             // You might also want to clear deviceName and deviceType if they are now represented by the ride
+                             // deviceName: null,
+                             // deviceType: null,
+                         });
+                         console.log(`Solo activity ${pendingMatch.soloActivityId} updated.`);
+                    } else {
+                        console.warn(`Activity match ${pendingMatch.id} is missing soloActivityId.`);
+                    }
+
+                    // If the proximity match indicates completion, update the participant's ride completion status
+                    if (proximityResult.isCompleted) {
+                         console.log(`Proximity match indicates completion for user ${pendingMatch.userId} on ride ${rideId}.`);
+                         // You might want a separate function in storage to mark participant ride completion
+                         // await storage.markParticipantRideCompleted(rideId, pendingMatch.userId);
+                    }
+
+
+                } else {
+                    console.log(`Match score ${matchScore.toFixed(2)}% < 50% for user ${pendingMatch.userId}. Keeping as solo activity.`);
+                    // Update the activity_match record to indicate match failed
+                     await storage.updateActivityMatch(pendingMatch.id, {
+                        organizerGpxId: organizerGpxId, // Link to the organizer's GPX file
+                        routeMatchPercentage: matchScore.toFixed(2),
+                        proximityScore: proximityResult.proximityScore.toFixed(2),
+                        matchedPoints: proximityResult.matchedPoints,
+                        totalOrganizerPoints: proximityResult.totalOrganizerPoints,
+                        isCompleted: false, // Not completed based on proximity
+                        isPendingProximityMatch: false, // No longer pending
+                        isRetroactivelyMatched: true, // Mark as retroactively processed
+                        isMatchFailed: true, // Mark as match failed
+                    });
+                     console.log(`Activity match ${pendingMatch.id} marked as match failed for user ${pendingMatch.userId}.`);
+                    // The corresponding solo activity remains as is.
+                }
+
+            } catch (participantMatchError) {
+                console.error(`Error processing pending participant match ${pendingMatch.id}:`, participantMatchError);
+                // In case of an error processing a single pending match, log it and continue with the next.
+                 // You might want to update the activity_match to reflect the error.
+                 // await storage.updateActivityMatch(pendingMatch.id, { isMatchFailed: true, isPendingProximityMatch: false });
+            }
+        }
+
+    } catch (error) {
+        console.error('Error in processPendingParticipantMatchesForRide:', error);
+        // Handle errors in fetching pending matches or the overall process
+      }
+    }
+
+
+  // New endpoint for manual participant GPX linking
+  app.post("/api/link-participant-gpx", requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { rideId, tempFilePath, gpxData } = req.body; // gpxData will be the parsed data sent from the frontend
+
+      console.log('Link participant GPX request body:', req.body);
+      console.log('Request data:', { rideId, tempFilePath, gpxData });
+
+      if (!rideId || !tempFilePath || !gpxData) {
+        console.log('Missing fields for participant link:', { rideId: !!rideId, tempFilePath: !!tempFilePath, gpxData: !!gpxData });
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify user is a participant of this ride
+      const isParticipant = await storage.isUserJoined(rideId, userId);
+        if (!isParticipant) {
+        return res.status(403).json({ message: "Not authorized - you are not a participant of this ride" });
+      }
+
+      // Check if user already has activity data for this ride
+      const existingActivity = await storage.getUserActivityForRide(rideId, userId);
+      if (existingActivity) {
+        console.log(`Existing activity found for ride ${rideId}, cannot link again.`);
+        return res.status(400).json({ message: "You have already linked an activity to this ride." });
+      }
+
+      // Calculate XP breakdown from GPX data
+      const distance = gpxData.distance || 0;
+      const elevationGain = gpxData.elevationGain || 0;
+      const averageSpeed = gpxData.averageSpeed || 0;
+
+      const xpFromDistance = Math.round(distance * 0.05);
+      const xpFromElevation = Math.round(elevationGain * 0.01);
+      const xpFromSpeed = Math.round(averageSpeed * 0.1);
+      const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
+      const roundedEarnedXp = Math.round(earnedXp);
+
+
+      // Check if organizer's GPX is available for this ride
+      const organizerGpx = await storage.getOrganizerGpxForRide(rideId);
+
+      let isPendingProximityMatch = true;
+      let matchScore = "0.00"; // Default to 0 until matched
+      let organizerGpxId: number | null = null; // Initialize as nullable number
+      let proximityMatchedPoints: number | null = null; // Initialize as nullable number
+      let proximityTotalOrganizerPoints: number | null = null; // Initialize as nullable number
+      let isProximityCompleted = false;
+
+
+      if (organizerGpx) {
+        console.log(`Organizer GPX found for ride ${rideId}. Attempting immediate proximity match.`);
+        try {
+            const organizerGpxData = await parseGPXFile(organizerGpx.gpxFilePath);
+            if (organizerGpxData) {
+                 const proximityResult = await proximityMatcher.checkParticipantProximity(
+                     organizerGpx.gpxFilePath, // Organizer's actual GPX path
+                     tempFilePath // Participant's uploaded GPX path
+                 );
+
+                 matchScore = (proximityResult.proximityScore * 100).toFixed(2);
+                 organizerGpxId = organizerGpx.id; // Link to the organizer's GPX file
+                 proximityMatchedPoints = proximityResult.matchedPoints;
+                 proximityTotalOrganizerPoints = proximityResult.totalOrganizerPoints;
+                 isProximityCompleted = proximityResult.isCompleted;
+
+                 isPendingProximityMatch = false; // Not pending, matched immediately
+                 console.log(`Immediate proximity match result for participant ${userId} on ride ${rideId}: ${matchScore}%`);
+
+                 // If immediately matched, update participant's ride completion status
+                 if (isProximityCompleted) {
+                     console.log(`Participant ${userId} completed ride ${rideId} based on immediate proximity match.`);
+                     // You might want a separate function in storage to mark participant ride completion
+                     // await storage.markParticipantRideCompleted(rideId, userId);
+                 }
+
+            } else {
+                 console.warn(`Could not parse organizer GPX for ride ${rideId} during manual participant link.`);
+            }
+        } catch (matchError) {
+            console.error('Error during immediate proximity match for participant link:', matchError);
+        }
+      } else {
+        console.log(`Organizer GPX not found for ride ${rideId}. Marking activity match as pending proximity match.`);
+        // isPendingProximityMatch remains true
+      }
+
+      // Create a solo activity first
+      console.log('Creating solo activity for manual participant link (initially)');
+      const soloActivity = await storage.createSoloActivity({
+        name: `Ride Activity - ${new Date().toLocaleDateString()}`, // Generic name initially
+        description: `Activity for joined ride ${rideId}`, // Generic description initially
+        activityType: 'cycling', // Assuming cycling
+        gpxFilePath: tempFilePath,
+        distance: gpxData.distance?.toString(),
+        duration: gpxData.duration,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString(),
+        averageSpeed: gpxData.averageSpeed?.toString(),
+        averageHeartRate: gpxData.averageHeartRate,
+        maxHeartRate: gpxData.maxHeartRate,
+        calories: gpxData.calories,
+        deviceName: gpxData.deviceName || 'Manual Upload',
+        deviceType: gpxData.deviceType || 'manual',
+        completedAt: new Date(), // Or use gpxData.startTime if available and reliable
+        userId,
+        xpEarned: roundedEarnedXp, // Award XP based on activity data immediately
+        xpDistance: xpFromDistance,
+        xpElevation: xpFromElevation,
+        xpSpeed: xpFromSpeed,
+      });
+      console.log('Solo activity created with ID:', soloActivity.id);
+
+
+      // Create activity match record, linking to the solo activity
+      console.log('Before creating activity match record for participant manual link');
+      const activityMatch = await storage.createActivityMatch({
+        rideId,
+        userId,
+        deviceId: gpxData.deviceName || 'manual-upload',
+        routeMatchPercentage: matchScore, // Will be 0 or calculated
+        gpxFilePath: tempFilePath,
+        distance: gpxData.distance?.toString() ?? null,
+        duration: gpxData.duration ?? null,
+        movingTime: gpxData.movingTime,
+        elevationGain: gpxData.elevationGain?.toString() ?? null,
+        averageSpeed: gpxData.averageSpeed?.toString() ?? null,
+        averageHeartRate: gpxData.averageHeartRate ?? null,
+        maxHeartRate: gpxData.maxHeartRate ?? null,
+        calories: gpxData.calories ?? null,
+        completedAt: new Date(), // Or use gpxData.startTime
+        xpEarned: roundedEarnedXp, // Store earned XP
+        xpDistance: xpFromDistance,
+        xpElevation: xpFromElevation,
+        xpSpeed: xpFromSpeed,
+        xpOrganizingBonus: 0,
+        organizerGpxId: organizerGpxId, // Link to organizer GPX if matched now
+        proximityScore: parseFloat(matchScore).toFixed(2), // Convert the matchScore string to a fixed-point string
+        matchedPoints: proximityMatchedPoints,
+        totalOrganizerPoints: proximityTotalOrganizerPoints,
+        isCompleted: isProximityCompleted,
+        isPendingProximityMatch: isPendingProximityMatch, // Set pending flag
+        soloActivityId: soloActivity.id, // Link to the solo activity
+      });
+        console.log('Activity match record created with ID:', activityMatch.id);
+
+     // Increment the user's total XP immediately for the solo activity.
+     if (roundedEarnedXp > 0) {
+        await storage.incrementUserXP(userId, roundedEarnedXp);
+        console.log(`Added ${roundedEarnedXp} XP to user ${userId} for manually linked activity (initially as solo).`);
+      }
+
+    // If immediately matched, update the solo activity to reflect the match
+    if (!isPendingProximityMatch) {
+        console.log(`Activity immediately matched, updating solo activity ${soloActivity.id}.`);
+        await storage.updateSoloActivity(soloActivity.id, {
+             name: `Matched Ride Activity: ${gpxData.name || 'Unnamed Activity'}`, // Update name to reflect match
+             description: `Activity matched to ride ${rideId}`, // Update description
+             // You might want to add a rideId foreign key to solo_activities table as well
+             // rideId: rideId,
+        });
+    }
+
+
+    res.json({
+      type: isPendingProximityMatch ? 'participant_manual_linked_pending' : 'participant_manual_linked_matched_immediately',
+      message: isPendingProximityMatch ?
+                 `Activity linked to ride ${rideId}. Awaiting organizer GPX for final match.` :
+                 `Activity successfully linked and matched to ride ${rideId}.`,
+      linkedRideId: rideId,
+      activityMatchId: activityMatch.id,
+      soloActivityId: soloActivity.id,
+      matchScore: parseFloat(matchScore), // Send calculated or default score
+      isPendingProximityMatch: isPendingProximityMatch,
+      activityData: { // Include activity data in the response
+          distance: gpxData.distance,
+          duration: gpxData.duration,
+          movingTime: gpxData.movingTime,
+          elevationGain: gpxData.elevationGain,
+          averageSpeed: gpxData.averageSpeed,
+          averageHeartRate: gpxData.averageHeartRate,
+          maxHeartRate: gpxData.maxHeartRate,
+      }
+    });
+
+  } catch (error) {
+    console.error("Link participant GPX error:", error);
+    res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
