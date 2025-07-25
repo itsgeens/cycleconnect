@@ -894,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `Automatically matched to your organized ride "${autoMatch.rideName}"`,
             matchScore: autoMatch.matchScore,
             rideName: autoMatch.rideName,
-            rideId: autoMatch.rideId
+            rideId: autoMatch.rideId,
             gpxData: { // Include the parsed gpxData
               distance: gpxData.distance,
               duration: gpxData.duration,
@@ -904,12 +904,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               averageHeartRate: gpxData.averageHeartRate,
               maxHeartRate: gpxData.maxHeartRate,
               calories: gpxData.calories,
-              deviceName: gpxData.deviceName,
-              deviceType: gpxData.deviceType,
               startTime: gpxData.startTime,
-              endTime: gpxData.endTime,
               name: gpxData.name,
-              description: gpxData.description,
+              
             }
           });
         } else {
