@@ -2,6 +2,8 @@ import { users, rides, rideParticipants, follows, deviceConnections, activityMat
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { supabase } from './supabase'; // MODIFIED: Added this import
+import { GPXProximityMatcher } from "./gpx-proximity-matcher"; // ADDED: Import the class
+import { parseGPXFile } from './gpx-parser'; // ADDED: Import the function
 
 
 export interface IStorage {
@@ -38,14 +40,17 @@ export interface IStorage {
   getUserStats(userId: number, timeframe: string): Promise<{
     ridesJoined: number;
     ridesHosted: number;
+    soloRides: number; // ADDED: Include soloRides
     totalDistance: number;
     totalElevation: number;
     ridesJoinedChange: number;
     ridesHostedChange: number;
+    soloRidesChange: number; // ADDED: Include soloRidesChange
     totalDistanceChange: number;
     totalElevationChange: number;
-    followersCount: number;
-    followingCount: number;
+    followersCount: number; // ADDED: Include followersCount
+    followingCount: number; // ADDED: Include followingCount
+    xp: number; // ADDED: Include xp
   }>;
   
   // Completed rides
@@ -74,6 +79,9 @@ export interface IStorage {
   getActivityMatches(rideId: number): Promise<ActivityMatch[]>;
   getUserActivityMatches(userId: number): Promise<ActivityMatch[]>;
   getUserActivityForRide(rideId: number, userId: number): Promise<ActivityMatch | undefined>;
+  getPendingActivityMatchesForRide(rideId: number): Promise<ActivityMatch[]>; // ADDED
+  updateActivityMatch(id: number, updates: Partial<ActivityMatch>): Promise<void>; // ADDED
+  processPendingActivityMatches(rideId: number, organizerGpxId: number, organizerGpxPath: string, proximityMatcher: any): Promise<void>; // ADDED
   
   // Organizer operations
   getOrganizerPlannedRides(organizerId: number, date: Date): Promise<Array<Ride>>;
@@ -203,6 +211,9 @@ export class DatabaseStorage implements IStorage {
         meetupLocation: rides.meetupLocation,
         meetupCoords: rides.meetupCoords,
         organizerId: rides.organizerId,
+        isCompleted: rides.isCompleted,
+        completedAt: rides.completedAt,
+        //weatherData: rides.weatherData,
         createdAt: rides.createdAt,
         organizerName: users.name,
         participantCount: sql<number>`COALESCE(COUNT(${rideParticipants.id}), 0)`.as('participantCount'),
@@ -326,6 +337,7 @@ export class DatabaseStorage implements IStorage {
         rideId: rideParticipants.rideId,
         userId: rideParticipants.userId,
         joinedAt: rideParticipants.joinedAt,
+        xpJoiningBonus: rideParticipants.xpJoiningBonus,
         userName: users.name,
       })
       .from(rideParticipants)
@@ -537,8 +549,13 @@ export class DatabaseStorage implements IStorage {
         completedAt: rides.completedAt,
         createdAt: rides.createdAt,
         organizerName: users.name,
-        weatherData: rides.weatherData, // Added weatherData
+        //weatherData: rides.weatherData, // Added weatherData
         participantCount: sql<number>`COUNT(DISTINCT ${rideParticipants.userId})`,
+        hasActivityMatch: sql<boolean>`EXISTS (
+          SELECT 1 FROM ${activityMatches}
+          WHERE ${activityMatches.rideId} = ${rides.id}
+          AND ${activityMatches.userId} = ${userId}
+        )`,
       })
       .from(rides)
       .leftJoin(users, eq(rides.organizerId, users.id))
@@ -572,10 +589,10 @@ export class DatabaseStorage implements IStorage {
       createdAt: ride.createdAt,
       organizerName: ride.organizerName || 'Unknown',
       participantCount: Number(ride.participantCount),
-      weatherData: ride.weatherData as any, // Explicitly cast weatherData
       isOrganizer: ride.organizerId === userId,
       isParticipant: ride.organizerId !== userId, // This logic seems reversed based on the comment
-    }))as Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean }>;
+      hasActivityMatch: ride.hasActivityMatch, // ADDED: Include the hasActivityMatch property
+    }))as Array<Ride & { organizerName: string; participantCount: number; isOrganizer: boolean; isParticipant: boolean; hasActivityMatch: boolean }>; // MODIFIED: Added hasActivityMatch to the type assertion
 
     return {
       all,
@@ -593,7 +610,23 @@ export class DatabaseStorage implements IStorage {
         isCompleted: ride.isCompleted,
         completedAt: ride.completedAt,
         createdAt: ride.createdAt,
-        weatherData: ride.weatherData as any, // Explicitly cast weatherData
+        organizerName: ride.organizerName || 'Unknown',
+        participantCount: Number(ride.participantCount),
+      })) as Array<Ride & { organizerName: string; participantCount: number }>,
+      joined: joined.map(ride => ({ // ADDED: Map the joined rides and include in return
+        id: ride.id,
+        name: ride.name,
+        description: ride.description,
+        dateTime: ride.dateTime,
+        rideType: ride.rideType,
+        surfaceType: ride.surfaceType,
+        gpxFilePath: ride.gpxFilePath,
+        meetupLocation: ride.meetupLocation,
+        meetupCoords: ride.meetupCoords as { lat: number; lng: number }, // Explicitly cast
+        organizerId: ride.organizerId,
+        isCompleted: ride.isCompleted,
+        completedAt: ride.completedAt,
+        createdAt: ride.createdAt,
         organizerName: ride.organizerName || 'Unknown',
         participantCount: Number(ride.participantCount),
       })) as Array<Ride & { organizerName: string; participantCount: number }>,
@@ -617,161 +650,7 @@ export class DatabaseStorage implements IStorage {
     }
     console.log(`[completeRide] User ${userId} verified as organizer for ride ${rideId}. Proceeding.`);
 
-
-    // --- Process Participant Matching and Activity XP ---
-
     console.log(`[completeRide] Starting XP calculation and distribution for ride ${rideId}.`);
-
-    // 1. Fetch participant activity data for this ride
-    const participantActivities = await db
-      .select()
-      .from(activityMatches)
-      .where(eq(activityMatches.rideId, rideId));
-
-    console.log(`[completeRide] Found ${participantActivities.length} participant activities for ride ${rideId}.`);
-
-    // 2. Calculate and add XP for each participant with activity data
-    for (const activity of participantActivities) {
-        console.log(`[completeRide] Processing activity match ${activity.id} for participant ${activity.userId}.`);
-        // Calculate XP based on participant's activity data
-        const distance = typeof activity.distance === 'string' ? parseFloat(activity.distance) : activity.distance || 0;
-        const elevationGain = typeof activity.elevationGain === 'string' ? parseFloat(activity.elevationGain) : activity.elevationGain || 0;
-        const averageSpeed = typeof activity.averageSpeed === 'string' ? parseFloat(activity.averageSpeed) : activity.averageSpeed || 0;
-
-        // Calculate XP contribution from each metric (rounded) - ADDED
-        const xpFromDistance = Math.round(distance * 0.05);
-        const xpFromElevation = Math.round(elevationGain * 0.01);
-        const xpFromSpeed = Math.round(averageSpeed * 0.1);
-
-        // Calculate total earned XP by summing the rounded breakdown values - MODIFIED
-        const earnedXp = xpFromDistance + xpFromElevation + xpFromSpeed;
-        const roundedEarnedXp = earnedXp; // Use earnedXp directly as it's already summed from rounded values
-
-
-        if (roundedEarnedXp > 0) {
-          console.log(`[completeRide] Calculated ${roundedEarnedXp.toFixed(2)} XP for participant ${activity.userId} (Activity ${activity.id}). Breakdown: D=${xpFromDistance}, E=${xpFromElevation}, S=${xpFromSpeed}`); 
-             
-            // Update the activity match record with the calculated XP breakdown and total.
-             await db.update(activityMatches)
-                     .set({ 
-                        xpEarned: roundedEarnedXp,
-                        xpDistance: xpFromDistance, // ADDED
-                        xpElevation: xpFromElevation, // ADDED
-                        xpSpeed: xpFromSpeed, // ADDED
-                        xpOrganizingBonus: 0, // Added to ensure consistency
-                      })
-                     .where(eq(activityMatches.id, activity.id));
-                     console.log(`[completeRide] Saved ${roundedEarnedXp} XP and breakdown to activityMatches record ${activity.id}.`); // MODIFIED log message
-             
-             // Increment the user's total XP *only if* XP was just awarded (optional check)
-             // Let's rely on incrementUserXP handling 0 for simplicity.
-             await this.incrementUserXP(activity.userId, roundedEarnedXp);
-             console.log(`[completeRide] Added ${roundedEarnedXp.toFixed(2)} XP to user ${activity.userId}.`);
-        }
-    }
-    console.log(`[completeRide] Finished participant matching and activity XP processing for ride ${rideId}.`);
-    // --- End Participant XP Processing ---
-
-    
-    console.log(`[completeRide] Processing participant joining bonus XP for ride ${rideId}.`);
-
-    // Fetch all participants for this ride
-    const participants = await db
-        .select()
-        .from(rideParticipants)
-        .where(eq(rideParticipants.rideId, rideId));
-
-    console.log(`[completeRide] Found ${participants.length} participants for joining bonus calculation.`);
-
-    // Calculate and award joining bonus for each participant
-    const joiningBonusPerParticipant = 1; // Example fixed joining bonus per participant
-
-    for (const participant of participants) {
-        console.log(`[completeRide] Processing joining bonus for participant ${participant.userId}.`);
-
-        // Check if joining bonus has already been awarded for this participant and ride
-        // This prevents awarding the bonus multiple times if completeRide is called again
-        if (participant.xpJoiningBonus === 0) { // Assuming default value is 0 and only updated when awarded
-             console.log(`[completeRide] Awarding joining bonus to participant ${participant.userId}.`);
-
-             // Update the rideParticipants record with the joining bonus
-             await db.update(rideParticipants)
-                     .set({ xpJoiningBonus: joiningBonusPerParticipant })
-                     .where(eq(rideParticipants.id, participant.id));
-                 console.log(`[completeRide] Saved ${joiningBonusPerParticipant} Joining Bonus XP to rideParticipants record ${participant.id}.`);
-
-             // Increment the user's total XP with the joining bonus
-             if (joiningBonusPerParticipant > 0) { // Only increment if joining bonus is positive
-                await this.incrementUserXP(participant.userId, joiningBonusPerParticipant);
-                console.log(`[completeRide] Added ${joiningBonusPerParticipant} Joining Bonus XP to user ${participant.userId}.`);
-             }
-        } else {
-            console.log(`[completeRide] Joining bonus already awarded to participant ${participant.userId}. Skipping.`);
-        }
-    }
-
-    console.log(`[completeRide] Finished participant joining bonus XP processing.`);
-    // --- End Participant Joining Bonus XP Processing ---
-
-
-    // --- Calculate and Add Incremental Organizer XP ---
-
-    console.log(`[completeRide] Calculating incremental organizer XP for ride ${rideId}.`);
-
-    // 1. Fetch all activity matches for this ride again to count participants with GPX
-    const allActivityMatchesForRide = await db
-        .select()
-        .from(activityMatches)
-        .where(eq(activityMatches.rideId, rideId));
-
-    // 2. Count participants with uploaded GPX files
-    const participantsWithGpxCount = allActivityMatchesForRide.filter(
-        activity => activity.gpxFilePath !== null && activity.gpxFilePath !== undefined
-    ).length;
-
-    console.log(`[completeRide] Found ${participantsWithGpxCount} participants with uploaded GPX for ride ${rideId}.`);
-
-    // 3. Define incremental XP per participant
-    const incrementalXpPerParticipant = 5; // Example: 5 XP per participant with GPX
-
-    // 4. Calculate total incremental XP for the organizer
-    const totalIncrementalOrganizerXp = participantsWithGpxCount * incrementalXpPerParticipant;
-
-    console.log(`[completeRide] Calculated total incremental organizer XP: ${totalIncrementalOrganizerXp}.`);
-
-    // 5. Add the incremental XP to the organizer's total XP
-    if (totalIncrementalOrganizerXp > 0) {
-        // Fetch the ride again to get the organizerId
-        const [ride] = await db.select().from(rides).where(eq(rides.id, rideId)).limit(1);
-        if (ride?.organizerId) {
-            await this.incrementUserXP(ride.organizerId, totalIncrementalOrganizerXp);
-            console.log(`[completeRide] Added ${totalIncrementalOrganizerXp} incremental XP to organizer ${ride.organizerId} for ride ${rideId}.`);
-
-            // Optionally, update the organizerGpxFiles record with this bonus if it exists
-            const [organizerGpx] = await db.select().from(organizerGpxFiles).where(eq(organizerGpxFiles.rideId, rideId)).limit(1);
-            if (organizerGpx) {
-                const currentOrganizingBonus = organizerGpx.xpOrganizingBonus || 0;
-                await db.update(organizerGpxFiles)
-                        .set({ xpOrganizingBonus: currentOrganizingBonus + totalIncrementalOrganizerXp })
-                        .where(eq(organizerGpxFiles.id, organizerGpx.id));
-                console.log(`[completeRide] Updated organizerGpxFiles record ${organizerGpx.id} with incremental bonus.`);
-            }
-
-        } else {
-            console.warn(`[completeRide] Could not find organizerId for ride ${rideId} to award incremental XP.`);
-        }
-    } else {
-        console.log(`[completeRide] No incremental organizer XP to add for ride ${rideId}.`);
-    }
-
-    // --- End Calculate and Add Incremental Organizer XP ---
-
-
-    // --- Organizer XP Calculation Removed ---
-    // The XP calculation for the organizer's GPX or the organizing bonus
-    // is removed from here. It will happen in the /api/upload-activity
-    // or /api/link-organizer-gpx routes when the organizer's GPX is processed.
-    console.log(`[completeRide] Organizer XP calculation skipped in completeRide. Handled during organizer GPX upload/linking.`);
 
     // Mark the ride as completed
     // Add a check if it's already completed to avoid unnecessary updates
@@ -801,6 +680,8 @@ export class DatabaseStorage implements IStorage {
     soloRidesChange: number;
     totalDistanceChange: number;
     totalElevationChange: number;
+    followersCount: number; // ADDED: Include in function signature type annotation
+    followingCount: number; // ADDED: Include in function signature type annotation
     xp: number;
   }> {
     const now = new Date();
@@ -847,12 +728,12 @@ export class DatabaseStorage implements IStorage {
           END)`,
           totalDistance: sql<number>`SUM(COALESCE(
             CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.distance} AS DECIMAL) ELSE 0 END,
-            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.distance} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} AND ${organizerGpxFiles.rideId} = ${rides.id} THEN CAST(${organizerGpxFiles.distance} AS DECIMAL) ELSE 0 END,
             0
           ))`,
           totalElevation: sql<number>`SUM(COALESCE(
             CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.elevationGain} AS DECIMAL) ELSE 0 END,
-            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.elevationGain} AS DECIMAL) ELSE 0 END,
+            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} AND ${organizerGpxFiles.rideId} = ${rides.id} THEN CAST(${organizerGpxFiles.elevationGain} AS DECIMAL) ELSE 0 END,
             0
           ))`,          
       })
@@ -891,14 +772,14 @@ export class DatabaseStorage implements IStorage {
           END)`,
           totalDistance: sql<number>`SUM(COALESCE(
             CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.distance} AS DECIMAL) ELSE 0 END,
-            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.distance} AS DECIMAL) ELSE 0 END,
+            CAST(${organizerGpxFiles.distance} AS DECIMAL), -- Directly include organizerGpxFiles distance if it exists in the join
             0
           ))`,
           totalElevation: sql<number>`SUM(COALESCE(
             CASE WHEN ${activityMatches.userId} = ${userId} THEN CAST(${activityMatches.elevationGain} AS DECIMAL) ELSE 0 END,
-            CASE WHEN ${organizerGpxFiles.organizerId} = ${userId} THEN CAST(${organizerGpxFiles.elevationGain} AS DECIMAL) ELSE 0 END,
+            CAST(${organizerGpxFiles.elevationGain} AS DECIMAL), -- Directly include organizerGpxFiles elevationGain if it exists in the join
             0
-          ))`,          
+          ))`,                   
       })
       .from(rides)
       .leftJoin(rideParticipants, eq(rides.id, rideParticipants.rideId))
@@ -1148,6 +1029,7 @@ export class DatabaseStorage implements IStorage {
         password: users.password,
         name: users.name,
         createdAt: users.createdAt,
+        xp: users.xp,
       })
       .from(users)
       .innerJoin(follows, eq(follows.followerId, users.id))
@@ -1197,6 +1079,7 @@ export class DatabaseStorage implements IStorage {
         password: users.password,
         name: users.name,
         createdAt: users.createdAt,
+        xp: users.xp,
       })
       .from(users)
       .innerJoin(follows, eq(follows.followingId, users.id))
@@ -1242,8 +1125,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(deviceConnections)
       .where(eq(deviceConnections.userId, userId))
-      .orderBy(desc(deviceConnections.lastConnectedAt));
-    
+
     return devices;
   }
 
@@ -1318,6 +1200,21 @@ export class DatabaseStorage implements IStorage {
         calories: activityMatches.calories,
         completedAt: activityMatches.completedAt,
         matchedAt: activityMatches.matchedAt,
+        xpEarned: activityMatches.xpEarned,
+        xpDistance: activityMatches.xpDistance,
+        xpElevation: activityMatches.xpElevation,
+        xpSpeed: activityMatches.xpSpeed,
+        xpOrganizingBonus: activityMatches.xpOrganizingBonus,
+        organizerGpxId: activityMatches.organizerGpxId,
+        proximityScore: activityMatches.proximityScore,
+        matchedPoints: activityMatches.matchedPoints,
+        totalOrganizerPoints: activityMatches.totalOrganizerPoints,
+        isCompleted: activityMatches.isCompleted,
+        isPendingProximityMatch: activityMatches.isPendingProximityMatch,
+        soloActivityId: activityMatches.soloActivityId,
+        isRetroactivelyMatched: activityMatches.isRetroactivelyMatched,
+        isMatchFailed: activityMatches.isMatchFailed,
+
         userName: users.name,
       })
       .from(activityMatches)
@@ -1499,8 +1396,9 @@ export class DatabaseStorage implements IStorage {
         meetupCoords: rides.meetupCoords,
         organizerId: rides.organizerId,
         isCompleted: rides.isCompleted,
-        completedAt: rides.completedAt,
+        completedAt: rides.completedAt!,
         createdAt: rides.createdAt,
+        //weatherData: rides.weatherData as any, // Ensure this matches your Ride schema type
         organizerName: users.name,
         participantCount: sql<number>`cast(count(${rideParticipants.id}) as int)`,
       })
@@ -1594,7 +1492,7 @@ export class DatabaseStorage implements IStorage {
               rideId: organizerGpxData.rideId,
               userId: userId, // Current user (organizer)
               deviceId: 'organizer-gpx',
-              routeMatchPercentage: organizerGpxData.matchScore,
+              routeMatchPercentage: organizerGpxData.matchScore ?? "0.00",
               gpxFilePath: organizerGpxData.gpxFilePath,
               distance: organizerGpxData.distance,
               duration: organizerGpxData.duration,
@@ -1647,17 +1545,17 @@ export class DatabaseStorage implements IStorage {
           surfaceType: ride.surfaceType,
           gpxFilePath: ride.gpxFilePath,
           meetupLocation: ride.meetupLocation,
-          meetupCoords: ride.meetupCoords as { lat: number; lng: number }, // Explicitly cast
+          meetupCoords: ride.meetupCoords as unknown, // Cast to 'unknown' to match the interface expectation
           organizerId: ride.organizerId,
           isCompleted: ride.isCompleted,
           completedAt: ride.completedAt!, // Use non-null assertion as these are completed rides
           createdAt: ride.createdAt,
-          weatherData: ride.weatherData as any, // Explicitly cast weatherData
+          // weatherData has been removed as per previous steps
           // Add the additional properties expected in the interface
           organizerName: ride.organizerName || 'Unknown',
           participantCount: Number(ride.participantCount), // Ensure number type
           userActivityData: finalUserActivityData, // Include the fetched/converted activity data
-          userParticipationData: userParticipationData, // Include the fetched participation data - ADDED
+          userParticipationData: userParticipationData, // Include the fetched participation data
         };
         console.log(`Final ride object for ride ${ride.id}:`, JSON.stringify(result, null, 2));
         
@@ -1774,62 +1672,35 @@ export class DatabaseStorage implements IStorage {
         isCompleted: rides.isCompleted,
         completedAt: rides.completedAt,
         createdAt: rides.createdAt,
-        weatherData: rides.weatherData,
+        //weatherData: rides.weatherData,
         organizerName: users.name,
       })
       .from(rides)
       .leftJoin(users, eq(rides.organizerId, users.id))
-      .where(eq(rides.organizerId, organizerId));
 
-    if (dateFilter) {
-      const startOfDay = new Date(dateFilter);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(dateFilter);
-      endOfDay.setHours(23, 59, 59, 999);
-      
-      query = query.where(
-        and(
-          eq(rides.organizerId, organizerId),
-          sql`${rides.dateTime} >= ${startOfDay}`,
-          sql`${rides.dateTime} <= ${endOfDay}`
-        )
-      );
-    }
+      const conditions = [
+        eq(rides.organizerId, organizerId),
+        eq(rides.isCompleted, false),
+      ];
 
-    const results = await query.orderBy(asc(rides.dateTime));
+      if (dateFilter) {
+        const startOfDay = new Date(dateFilter);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(dateFilter);
+        endOfDay.setHours(23, 59, 59, 999);
     
-    return results.map(row => ({
+        conditions.push(sql`${rides.dateTime} >= ${startOfDay}`);
+        conditions.push(sql`${rides.dateTime} <= ${endOfDay}`);
+      }
+
+      const results = await query.where(and(...conditions)).orderBy(asc(rides.dateTime)); // Combined where clause
+
+      return results.map(row => ({
       ...row,
       organizerName: row.organizerName || 'Unknown',
     }));
   }
 
-  async getRideParticipantIds(rideId: number): Promise<number[]> {
-    const participants = await db
-      .select({ userId: rideParticipants.userId })
-      .from(rideParticipants)
-      .where(eq(rideParticipants.rideId, rideId));
-    
-    return participants.map(p => p.userId);
-  }
-
-  async getPendingParticipantGpxFiles(rideId: number, participantIds: number[]): Promise<Array<{
-    userId: number;
-    gpxFilePath: string;
-    activityDate: Date;
-  }>> {
-    // Get solo activities from participants that might match this ride
-    const activities = await db
-      .select({
-        userId: soloActivities.userId,
-        gpxFilePath: soloActivities.gpxFilePath,
-        activityDate: soloActivities.completedAt,
-      })
-      .from(soloActivities)
-      .where(sql`${soloActivities.userId} = ANY(${participantIds})`);
-    
-    return activities;
-  }
 
   async getOrganizerGpxForRide(rideId: number): Promise<OrganizerGpxFile | undefined> {
     const [organizerGpx] = await db
@@ -1856,6 +1727,194 @@ export class DatabaseStorage implements IStorage {
       
     console.log(`Decremented user ${userId} XP by ${amount}.`);
   }
+
+  async processPendingActivityMatches(rideId: number, organizerGpxId: number, organizerGpxPath: string, proximityMatcher: any) {
+    console.log(`[storage] Processing pending activity matches for ride ${rideId}`);
+    const ride = await this.getRide(rideId); // Use this.getRide
+
+    if (!ride) {
+         console.warn(`[storage] Ride ${rideId} not found during pending activity matching.`);
+         return; // Exit if ride is not found
+    }
+
+    // Get all activity_match records for this ride that are pending proximity match
+    const pendingActivityMatches = await this.getPendingActivityMatchesForRide(rideId); // Use this.getPendingActivityMatchesForRide
+
+    console.log(`[storage] Found ${pendingActivityMatches.length} pending activity matches for ride ${rideId}.`);
+
+    for (const pendingMatch of pendingActivityMatches) {
+        try { // === Start of the inner try block ===
+            console.log(`[storage] Processing pending match for user ${pendingMatch.userId} with activity match ID ${pendingMatch.id}.`);
+
+            // Retrieve and parse the participant's GPX data
+             // Make sure parseGPXFile is accessible/imported at the top of storage.ts
+             const participantGpxData = await parseGPXFile(pendingMatch.gpxFilePath);
+
+             if (!participantGpxData || !participantGpxData.startTime || isNaN(participantGpxData.startTime.getTime())) {
+                 console.warn(`[storage] Could not parse participant GPX for pending match ${pendingMatch.id} or invalid data.`);
+                 // Mark as failed and not pending
+                 await this.updateActivityMatch(pendingMatch.id, { isMatchFailed: true, isPendingProximityMatch: false });
+                 continue; // Skip this pending match and move to the next
+             }
+
+            // Perform the proximity match calculation
+            console.log(`[storage] Attempting proximity match for user ${pendingMatch.userId} using organizer GPX ${organizerGpxPath} and participant GPX ${pendingMatch.gpxFilePath}`);
+            // Make sure proximityMatcher is accessible/imported at the top of storage.ts
+            const proximityMatcher = new GPXProximityMatcher(); // OPTION 2: Initialize here if stateless
+            const proximityResult = await proximityMatcher.checkParticipantProximity(
+                organizerGpxPath, // Newly uploaded organizer's actual GPX
+                pendingMatch.gpxFilePath // Participant's uploaded GPX
+            );
+            console.log(`[storage] Proximity match result for user ${pendingMatch.userId}: ${proximityResult.proximityScore.toFixed(1)}%`);
+
+            const matchScore = proximityResult.proximityScore * 100;
+
+            if (matchScore >= 50) {
+                console.log(`[storage] Match score ${matchScore.toFixed(2)}% >= 50% for user ${pendingMatch.userId}. Linking activity.`);
+                // Update the activity_match record with match results
+                await this.updateActivityMatch(pendingMatch.id, {
+                    organizerGpxId: organizerGpxId, // Link to the organizer's GPX file
+                    routeMatchPercentage: matchScore.toFixed(2),
+                    proximityScore: proximityResult.proximityScore.toFixed(2),
+                    matchedPoints: proximityResult.matchedPoints,
+                    totalOrganizerPoints: proximityResult.totalOrganizerPoints,
+                    isCompleted: proximityResult.isCompleted, // Update completion status based on match
+                    isPendingProximityMatch: false, // No longer pending
+                    isRetroactivelyMatched: true, // Mark as retroactively matched
+                    isMatchFailed: false, // Ensure failed flag is false
+                });
+                console.log(`[storage] Activity match ${pendingMatch.id} updated and linked for user ${pendingMatch.userId}.`);
+
+                // Update the corresponding solo activity
+                if (pendingMatch.soloActivityId) {
+                     await this.updateSoloActivity(pendingMatch.soloActivityId, {
+                         name: `Matched Ride Activity: ${participantGpxData.name || 'Unnamed Activity'}`, // Adjust based on your GpxData structure
+                         description: `Activity matched to ride ${rideId}`, // Update description
+                         // Consider adding a rideId foreign key to solo_activities and updating it here
+                         // rideId: rideId,
+                         // You might also want to clear deviceName and deviceType if they are now represented by the ride
+                         // deviceName: null,
+                         // deviceType: null,
+                     });
+                     console.log(`[storage] Solo activity ${pendingMatch.soloActivityId} updated.`);
+                } else {
+                    console.warn(`[storage] Activity match ${pendingMatch.id} is missing soloActivityId.`);
+                }
+
+                // If the proximity match indicates completion, update the participant's ride completion status
+                if (proximityResult.isCompleted) {
+                     console.log(`Proximity match indicates completion for user ${pendingMatch.userId} on ride ${rideId}.`);
+                     // You might want a separate function in storage to mark participant ride completion
+                     // await this.markParticipantRideCompleted(rideId, pendingMatch.userId); // Use this.
+                }
+
+                 // --- Award Participant Joining Bonus (if not already awarded) ---
+                 // Check if the participant has already received the joining bonus for this ride
+                 // You might need to fetch the rideParticipant record here
+                 try {
+                      const [participantRecord] = await db // Make sure db is accessible/imported at the top of storage.ts
+                           .select()
+                           .from(rideParticipants) // Make sure rideParticipants schema is imported at the top of storage.ts
+                           .where(and(eq(rideParticipants.rideId, rideId), eq(rideParticipants.userId, pendingMatch.userId)))
+                           .limit(1);
+
+                      if (participantRecord && participantRecord.xpJoiningBonus === 0) {
+                           const participantJoiningBonus = 0.5; // Define the participant joining bonus
+                           await db // Use db for direct update if not in storage class
+                               .update(rideParticipants)
+                               .set({ xpJoiningBonus: participantJoiningBonus })
+                               .where(eq(rideParticipants.id, participantRecord.id));
+
+                           console.log(`Awarded ${participantJoiningBonus} joining bonus XP to participant ${pendingMatch.userId} for ride ${rideId} during retroactive matching.`);
+                           // Increment the user's total XP with the joining bonus
+                           await this.incrementUserXP(pendingMatch.userId, participantJoiningBonus); // Use this.incrementUserXP
+                           console.log(`Added ${participantJoiningBonus} joining bonus XP to user ${pendingMatch.userId}.`);
+                        } else if (participantRecord && participantRecord.xpJoiningBonus !== null && participantRecord.xpJoiningBonus > 0) { // MODIFIED: Explicitly check for not null
+                            console.log(`Joining bonus already awarded to participant ${pendingMatch.userId} for ride ${rideId}. Skipping joining bonus.`);
+                        } else {
+                           console.warn(`Ride participant record not found for user ${pendingMatch.userId} on ride ${rideId} during retroactive matching. Cannot award joining bonus.`);
+                      }
+                 } catch (joiningBonusError) {
+                      console.error('Error awarding participant joining bonus during retroactive matching:', joiningBonusError);
+                 }
+                 // --- End Award Participant Joining Bonus ---
+
+
+                // --- Award Incremental Participant Bonus to Others ---
+                console.log(`Awarding incremental participant bonus to others for retroactive match of user ${pendingMatch.userId}.`);
+                try {
+                  // Find other participants who have *already* successfully linked their activities to this ride
+                  // getParticipantsWithLinkedActivitiesForRide should return participants with isPendingProximityMatch = false and isMatchFailed = false
+                  const previouslyLinkedParticipants = await this.getParticipantsWithLinkedActivitiesForRide(rideId);
+
+                  const incrementalParticipantBonus = 0.5; // Define the incremental participant bonus
+
+                  for (const participant of previouslyLinkedParticipants) {
+                      // Ensure we are only considering *other* participants who were already linked
+                       if (participant.userId !== pendingMatch.userId) {
+                           console.log(`Awarding ${incrementalParticipantBonus} incremental XP:`);
+                           console.log(` - To user ${pendingMatch.userId} (just linked) because participant ${participant.userId} was already linked.`);
+                           console.log(` - To participant ${participant.userId} (already linked) because user ${pendingMatch.userId} just linked.`);
+
+                           // Award bonus to the CURRENT user (who just linked) for this previously linked participant
+                           await this.incrementUserXP(pendingMatch.userId, incrementalParticipantBonus);
+
+                           // Award bonus to the PREVIOUSLY linked participant because the current user just linked
+                           await this.incrementUserXP(participant.userId, incrementalParticipantBonus);
+
+                            // Optional: Update activity_match records if you want to log this bonus
+                            // You would need to fetch the activity_match records for both users
+                            // const currentUserActivityMatch = await this.getUserActivityForRide(rideId, pendingMatch.userId);
+                            // const otherUserActivityMatch = await this.getUserActivityForRide(rideId, participant.userId);
+                            // if (currentUserActivityMatch) { await this.updateActivityMatch(currentUserActivityMatch.id, {...}); }
+                            // if (otherUserActivityMatch) { await this.updateActivityMatch(otherUserActivityMatch.id, {...}); }
+                       }
+                  }
+                 // Handle the case where there are no previously linked participants (no bonus awarded yet)
+                  if (previouslyLinkedParticipants.length === 0) {
+                      console.log(`No other participants with linked activities found for ride ${rideId}. No incremental bonuses awarded yet.`);
+                  }
+
+
+                } catch (incrementalParticipantError) {
+                   console.error('Error awarding incremental participant XP:', incrementalParticipantError);
+                }
+              // --- End Award Incremental Participant Bonuses ---
+
+
+            } else { // Match score < 50%
+                console.log(`[storage] Match score ${matchScore.toFixed(2)}% < 50% for user ${pendingMatch.userId}. Keeping as solo activity.`);
+                // Update the activity_match record to indicate match failed
+                 await this.updateActivityMatch(pendingMatch.id, {
+                    organizerGpxId: organizerGpxId, // Link to the organizer's GPX file (optional, could be null)
+                    routeMatchPercentage: matchScore.toFixed(2),
+                    proximityScore: proximityResult.proximityScore.toFixed(2),
+                    matchedPoints: proximityResult.matchedPoints,
+                    totalOrganizerPoints: proximityResult.totalOrganizerPoints,
+                    isCompleted: false, // Not completed based on proximity
+                    isPendingProximityMatch: false, // No longer pending
+                    isRetroactivelyMatched: true, // Mark as retroactively processed
+                    isMatchFailed: true, // Mark as match failed
+                });
+                 console.log(`[storage] Activity match ${pendingMatch.id} marked as match failed for user ${pendingMatch.userId}.`);
+                // The corresponding solo activity remains as is. No XP awarded here.
+            }
+
+        } catch (participantMatchError) { // === End of the inner try block, start of catch ===
+            console.error(`[storage] Error processing pending participant match ${pendingMatch.id}:`, participantMatchError);
+            // In case of an error processing a single pending match, log it and continue with the next.
+             try { // Inner try for updating the record as failed
+                 await this.updateActivityMatch(pendingMatch.id, { isMatchFailed: true, isPendingProximityMatch: false });
+                 console.log(`[storage] Activity match ${pendingMatch.id} marked as failed due to processing error.`);
+             } catch (updateError) {
+                 console.error(`[storage] Error updating activity match ${pendingMatch.id} as failed after processing error:`, updateError);
+             }
+            // Continue to the next pending match automatically
+        } // === End of the catch block ===
+    }
+    console.log(`[storage] Finished processing pending activity matches for ride ${rideId}.`);
+  }
+
   async getPendingActivityMatchesForRide(rideId: number): Promise<ActivityMatch[]> {
     console.log(`[storage] Fetching pending activity matches for ride ${rideId}`);
     try {
@@ -1911,6 +1970,43 @@ export class DatabaseStorage implements IStorage {
       throw error; // Re-throw the error
     }
   }
+
+  async getParticipantsWithLinkedActivitiesForRide(rideId: number): Promise<Array<{ userId: number; activityMatchId: number }>> {
+    console.log(`[storage] Fetching participants with linked activities for ride ${rideId}`);
+    try {
+        const linkedParticipants = await db
+            .select({
+                userId: activityMatches.userId,
+                activityMatchId: activityMatches.id,
+            })
+            .from(activityMatches)
+            .where(and(eq(activityMatches.rideId, rideId), eq(activityMatches.isPendingProximityMatch, false), eq(activityMatches.isMatchFailed, false))); // Only include successfully matched activities
+
+        console.log(`[storage] Found ${linkedParticipants.length} participants with linked activities for ride ${rideId}.`);
+        return linkedParticipants;
+    } catch (error) {
+        console.error(`[storage] Error fetching participants with linked activities for ride ${rideId}:`, error);
+        throw error; // Re-throw the error
+    }
+  }
+  async getRideParticipantIds(rideId: number): Promise<number[]> {
+    // TODO: Implement logic to fetch participant IDs for a given rideId
+    console.warn(`getRideParticipantIds not implemented for rideId: ${rideId}`);
+    // Return an empty array or a mock array for now
+    return []; 
+  }
+
+  async getPendingParticipantGpxFiles(rideId: number, participantIds: number[]): Promise<Array<{
+    userId: number;
+    gpxFilePath: string;
+    activityDate: Date;
+  }>> {
+    // TODO: Implement logic to fetch pending participant GPX files
+    console.warn(`getPendingParticipantGpxFiles not implemented for rideId: ${rideId}, participantIds: ${participantIds}`);
+    // Return an empty array or a mock array for now
+    return [];
+  }
+
 }
 
 export const storage = new DatabaseStorage();

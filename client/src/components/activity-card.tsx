@@ -40,6 +40,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGPXStats } from "@/hooks/use-gpx-stats";
+import { authManager } from "@/lib/auth"; // Assuming this is the correct path
+
+
 
 
 export interface ParticipantActivityMatch {
@@ -82,6 +85,8 @@ export default function ActivityCard({ activity, type, queryClient }: ActivityCa
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const { toast } = useToast();
   const { stats } = useGPXStats(activity.gpxFilePath);
+  const user = authManager.getUser();
+  const currentUserId = user?.id; // Use optional chaining in case user is null
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -410,7 +415,7 @@ export default function ActivityCard({ activity, type, queryClient }: ActivityCa
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-grow-0">
             {isGroup && (
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
@@ -419,18 +424,6 @@ export default function ActivityCard({ activity, type, queryClient }: ActivityCa
                 <Badge variant="outline" className="text-xs">
                   {activity.surfaceType || 'paved'}
                 </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowParticipantsModal(true);
-                  }}
-                  className="text-xs"
-                >
-                  <Users className="w-3 h-3 mr-1" />
-                  View All Participants
-                </Button>
               </div>
             )}
             {!isGroup && activity.activityType && (
@@ -439,32 +432,91 @@ export default function ActivityCard({ activity, type, queryClient }: ActivityCa
               </Badge>
             )}
           </div>
+          {/* RESTORE THIS DIV - It contains the action buttons */}
+<div className="flex items-center gap-2 ml-auto">
+    {isGroup && ( // This condition applies to group ride action buttons
+      <>
+        {/* PUT THE CORRECT "View Performance Details" BUTTON HERE */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (currentUserId) { // Add a check to ensure currentUserId is available
+              navigate(`/my-performance/${activity.id}/${currentUserId}`);
+            } else {
+              console.error("Logged-in user ID not available!");
+              // Optionally show a toast or other error message
+            }
+          }}
+          className="mr-2"
+        >
+          <Activity className="w-3 h-3 mr-1" />
+          View Performance Details
+        </Button>
+        {/* Ensure "View Event Details" button is here */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/ride/${activity.id}`);
+          }}
+        >View Event Details</Button>
+      </>
+    )}
+    {!isGroup && ( // This block contains solo activity action buttons
+      <>
+        {/* "View Performance Details" for solo activities remains here */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/my-performance/solo/${activity.id}`);
+          }}
+          className="mr-2"
+        >
+          <Activity className="w-3 h-3 mr-1" />
+          View Performance Details
+        </Button>
+        {/* ... AlertDialog for deleting solo activities remains here ... */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => e.stopPropagation()}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Delete
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this activity? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteActivity}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    )}
+</div>
 
+          
           <div className="flex items-center gap-2">
-            {isGroup && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/my-performance/${activity.id}`);
-                  }}
-                  className="mr-2"
-                >
-                  <Activity className="w-3 h-3 mr-1" />
-                  View Performance Details
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/ride/${activity.id}`);
-                  }}
-                >View Event Details</Button>
-              </>
-            )}
             {!isGroup && (
               <>
                 <Button
@@ -514,6 +566,8 @@ export default function ActivityCard({ activity, type, queryClient }: ActivityCa
           </div>
         </div>
       </CardContent>
+
+
       {/* Participants Modal for Group Rides */}
       {isGroup && (
         <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>

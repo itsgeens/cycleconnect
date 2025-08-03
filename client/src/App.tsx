@@ -18,6 +18,8 @@ import MyPerformance from "@/pages/my-performance";
 import { authManager } from "./lib/auth";
 import { useEffect, useState } from "react";
 
+
+
 function Router() {
   const [authState, setAuthState] = useState(authManager.getState());
 
@@ -30,6 +32,7 @@ function Router() {
     return <Auth />;
   }
 
+
   return (
     <Switch>
       <Route path="/" component={Home} />
@@ -41,7 +44,9 @@ function Router() {
       <Route path="/manage-devices" component={ManageDevices} />
       <Route path="/followers/:id" component={FollowersPage} />
       <Route path="/ride/:id" component={RideDetail} />
-      <Route path="/my-performance/:id" component={MyPerformance} />
+      <Route path="/my-performance/:rideId/:userId">
+        {params => <MyPerformance id={params.rideId} userId={params.userId} />}
+      </Route>
       <Route path="/my-performance/solo/:id" component={MyPerformance} />
 
       <Route component={NotFound} />

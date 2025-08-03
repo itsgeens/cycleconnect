@@ -33,6 +33,15 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    proxy: {
+      // Proxy requests starting with '/api'
+      '/api': {
+        target: 'http://localhost:5000', // *** IMPORTANT: Replace 5000 if your backend runs on a different port ***
+        changeOrigin: true, // Needed for CORS
+        // rewrite: (path) => path.replace(/^\/api/, '/api'), // Optional: keep /api prefix if your backend expects it
+  
+      },
+    },
   },
 });
 

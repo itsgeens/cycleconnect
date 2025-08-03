@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { supabase } from './supabase'; // Import your Supabase client
+import { GPXProximityMatcher } from './gpx-proximity-matcher'; // Import GPXProximityMatcher
+
 
 export interface GpxData {
   distance?: number; // in km
@@ -171,6 +173,13 @@ export async function parseGPXFile(supabaseFilePath: string): Promise<GpxData> {
     let averageSpeed: number | undefined;
     if (movingTime > 0 && totalDistance > 0) {
       averageSpeed = (totalDistance / (movingTime / 3600)); // km/h
+
+     // ADDED: Detailed logging for calculated averageSpeed
+     console.log('Calculated raw averageSpeed:', averageSpeed);
+     console.log('Type of calculated averageSpeed:', typeof averageSpeed);
+     console.log('Is calculated averageSpeed finite:', Number.isFinite(averageSpeed));
+     // END ADDED logging
+     
     }
 
     // Calculate heart rate metrics
@@ -221,59 +230,27 @@ function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
-// Simple route matching algorithm
+// Simple route matching algorithm - Now uses GPXProximityMatcher's track point overlap
 export function calculateRouteMatch(gpxData1: GpxData, gpxData2: GpxData): number {
-  console.log('Inside calculateRouteMatch - gpxData1:', gpxData1); // Add this log
-  console.log('Inside calculateRouteMatch - gpxData2:', gpxData2); // Add this log
-  if (!gpxData1.trackPoints.length || !gpxData2.trackPoints.length) {
-      console.log('Inside calculateRouteMatch - one or both trackPoints arrays are empty or undefined'); // Log if arrays are empty/undefined
-    return 0;
-  }
+  console.log('Inside calculateRouteMatch (using GPXProximityMatcher) - gpxData1:', gpxData1);
+  console.log('Inside calculateRouteMatch (using GPXProximityMatcher) - gpxData2:', gpxData2);
 
-  // Simplified route matching based on distance similarity and key waypoints
-  const distance1 = gpxData1.distance || 0;
-  const distance2 = gpxData2.distance || 0;
+  // Create a GPXProximityMatcher instance (using default config)
+  const proximityMatcher = new GPXProximityMatcher();
 
-  // Distance similarity (within 5% considered similar)
-  const distanceRatio = Math.min(distance1, distance2) / Math.max(distance1, distance2);
-  const distanceScore = distanceRatio > 0.95 ? 1 : distanceRatio;
+  // Use the compareProximity logic for the match score
+  // We need to call compareProximity with the participant data first, then organizer data
+  // as compareProximity is designed to check participant points against organizer points
+  const proximityResult = proximityMatcher.compareProximity(gpxData1, gpxData2);
 
-  // Simple waypoint matching - compare start and end points
-  const startPoint1 = gpxData1.trackPoints[0];
-  const endPoint1 = gpxData1.trackPoints[gpxData1.trackPoints.length - 1];
-  const startPoint2 = gpxData2.trackPoints[0];
-  const endPoint2 = gpxData2.trackPoints[gpxData2.trackPoints.length - 1];
+  // The match score is the proximity score calculated by GPXProximityMatcher
+  const matchScore = proximityResult.proximityScore / 100; // Convert percentage back to 0-1 scale
 
-  const startDistance = calculateDistance(startPoint1.lat, startPoint1.lon, startPoint2.lat, startPoint2.lon);
-  const endDistance = calculateDistance(endPoint1.lat, endPoint1.lon, endPoint2.lat, endPoint2.lon);
+  console.log('calculateRouteMatch result (from ProximityMatcher):', matchScore.toFixed(2));
 
-  // Points within 1km are considered matching, but be more lenient for nearby routes
-  const startScore = startDistance < 1 ? 1 : Math.max(0, 1 - startDistance / 10);
-  const endScore = endDistance < 1 ? 1 : Math.max(0, 1 - endDistance / 10);
-
-  const waypointScore = (startScore + endScore) / 2;
-
-  // For routes in the same general area (within 5km), boost the score
-  const sameAreaBonus = startDistance < 5 ? 0.2 : 0;
-
-  // Combined score (weighted average)
-  const totalScore = (distanceScore * 0.4) + (waypointScore * 0.6) + sameAreaBonus;
-
-  console.log('Route matching debug:', {
-    distance1: distance1?.toFixed(0),
-    distance2: distance2?.toFixed(0),
-    distanceScore: distanceScore.toFixed(2),
-    startDistance: startDistance.toFixed(0) + 'm',
-    endDistance: endDistance.toFixed(0) + 'm',
-    startScore: startScore.toFixed(2),
-    endScore: endScore.toFixed(2),
-    waypointScore: waypointScore.toFixed(2),
-    sameAreaBonus: sameAreaBonus.toFixed(2),
-    totalScore: totalScore.toFixed(2)
-  });
-
-  return Math.max(0, Math.min(1, totalScore));
+  return Math.max(0, Math.min(1, matchScore)); // Ensure score is between 0 and 1
 }
+
 
 export function checkParticipantProximity(
   organizerGpxPath: string,

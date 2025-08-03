@@ -1,5 +1,8 @@
-import { parseGPXFile, type GpxData, type TrackPoint } from './gpx-parser';
+import { parseGPXFile, type GpxData } from './gpx-parser';
 import { calculateDistance } from './gpx-parser';
+import { calculateRouteMatch } from './gpx-parser'; // Make sure calculateRouteMatch is imported here
+
+
 
 interface ProximityMatchConfig {
   proximityRadius: number; // meters
@@ -24,8 +27,8 @@ export class GPXProximityMatcher {
 
   constructor(config: ProximityMatchConfig = {
     proximityRadius: 50, // 50 meters
-    timeWindow: 15, // 15 seconds
-    minMatchPercentage: 80, // 80% completion threshold
+    timeWindow: 60, // 60 seconds
+    minMatchPercentage: 50, // 80% completion threshold
   }) {
     this.config = config;
     console.log('GPXProximityMatcher constructor called with config:', this.config); // Add this log
@@ -48,7 +51,7 @@ export class GPXProximityMatcher {
     return this.compareProximity(organizerData, participantData);
   }
 
-  private compareProximity(organizerData: GpxData, participantData: GpxData): ProximityResult {
+  public compareProximity(organizerData: GpxData, participantData: GpxData): ProximityResult {
     console.log('Inside compareProximity - organizerData:', organizerData); // Add this log
     console.log('Inside compareProximity - participantData:', participantData); // Add this log
     const organizerPoints = organizerData.trackPoints.filter(p => p.time); // Only points with timestamps
@@ -157,7 +160,7 @@ export class GPXProximityMatcher {
     organizerGpxData: GpxData,
     plannedRides: Array<{ id: number; dateTime: Date; gpxFilePath: string; name: string }>
   ): Promise<{ rideId: number; matchScore: number; rideName: string } | null> {
-    const activityDate = new Date(organizerGpxData.startTime);
+    const activityDate = organizerGpxData.startTime ? new Date(organizerGpxData.startTime) : new Date(); // Provide a fallback Date
     
     // Filter rides on same calendar date
     const sameDateRides = plannedRides.filter(ride => {
@@ -178,7 +181,7 @@ export class GPXProximityMatcher {
     for (const ride of sameDateRides) {
       try {
         const plannedGpxData = await parseGPXFile(ride.gpxFilePath);
-        const matchScore = this.calculateRouteMatch(organizerGpxData, plannedGpxData);
+        const matchScore = calculateRouteMatch(organizerGpxData, plannedGpxData);
 
         console.log(`Route similarity for "${ride.name}": ${(matchScore * 100).toFixed(1)}%`);
 
@@ -196,36 +199,5 @@ export class GPXProximityMatcher {
     }
 
     return bestMatch;
-  }
-
-  private calculateRouteMatch(gpxData1: GpxData, gpxData2: GpxData): number {
-    if (!gpxData1.trackPoints.length || !gpxData2.trackPoints.length) {
-      return 0;
-    }
-
-    // Distance similarity (within 5% considered good match)
-    const distance1 = gpxData1.distance || 0;
-    const distance2 = gpxData2.distance || 0;
-    const distanceRatio = Math.min(distance1, distance2) / Math.max(distance1, distance2);
-    const distanceScore = distanceRatio > 0.95 ? 1 : Math.max(0, distanceRatio - 0.1);
-
-    // Start/end point similarity
-    const start1 = gpxData1.trackPoints[0];
-    const end1 = gpxData1.trackPoints[gpxData1.trackPoints.length - 1];
-    const start2 = gpxData2.trackPoints[0];
-    const end2 = gpxData2.trackPoints[gpxData2.trackPoints.length - 1];
-
-    const startDistance = calculateDistance(start1.lat, start1.lon, start2.lat, start2.lon) * 1000; // meters
-    const endDistance = calculateDistance(end1.lat, end1.lon, end2.lat, end2.lon) * 1000; // meters
-
-    // Points within 500m are considered matching
-    const startScore = startDistance < 500 ? 1 : Math.max(0, 1 - startDistance / 2000);
-    const endScore = endDistance < 500 ? 1 : Math.max(0, 1 - endDistance / 2000);
-    const waypointScore = (startScore + endScore) / 2;
-
-    // Combined score with higher weight on waypoints for accuracy
-    const totalScore = (distanceScore * 0.3) + (waypointScore * 0.7);
-
-    return Math.min(1, totalScore);
   }
 }
